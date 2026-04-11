@@ -1,7 +1,7 @@
 [project]
 name = "openwhisper-desktop"
 version = "0.1.0"
-description = "Add your description here"
+description = "A messaging application with a focus on privacy and security. Written in Python and Django."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
