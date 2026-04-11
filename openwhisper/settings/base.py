@@ -23,6 +23,8 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
 SECRET_KEY = env.str('SECRET_KEY')
 
+DEBUG = False
+
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 # Application definition
@@ -30,8 +32,10 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
+    'rest_framework_simplejwt',
     'daphne',
     'tailwind',
+    'theme',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -173,3 +177,5 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+TAILWIND_APP_NAME = 'theme'
