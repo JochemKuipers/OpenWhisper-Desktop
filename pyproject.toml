@@ -5,17 +5,21 @@ description = "A messaging application with a focus on privacy and security. Wri
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "channels>=4.3.2",
+    "channels[daphne]>=4.3.2",
     "channels-redis>=4.3.0",
     "django==5.2",
     "django-cors-headers>=4.9.0",
     "djangorestframework>=3.17.1",
     "djangorestframework-simplejwt>=5.5.1",
+    "pillow>=12.2.0",
+    "psycopg[binary]>=3.3.3",
     "redis>=7.4.0",
 ]
 
 [dependency-groups]
 dev = [
+    "channels[types]>=4.3.2",
+    "django-stubs>=6.0.2",
     "mypy>=1.20.0",
     "pytest>=9.0.3",
     "pytest-django>=4.12.0",
