@@ -16,17 +16,44 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import include, path
+from django.contrib.auth.models import User
+from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+from django.urls import URLPattern, URLResolver, include, path
 from django.conf import settings
-from debug_toolbar.toolbar import debug_toolbar_urls
+from rest_framework import routers, serializers, viewsets
+from openwhisper.apps.user.models import User as OpenWhisperUser
 
-urlpatterns = [
+# Serializers define the API representation.
+class UserSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = OpenWhisperUser
+        fields = ["url", "username", "email", "is_staff"]
+
+
+# ViewSets define the view behavior.
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = OpenWhisperUser.objects.all()
+    serializer_class = UserSerializer
+    
+router = routers.DefaultRouter()
+router.register(r'users', UserViewSet, basename='user')
+
+urlpatterns: list[URLPattern | URLResolver] = [
+    path("", include("openwhisper.apps.theme.urls")),
     path("admin/", admin.site.urls),
+    path("api/", include(router.urls)),
+    path("api-auth/", include("rest_framework.urls", namespace="rest_framework"))
 ]
 
 
 if settings.DEBUG:
-    # Include django_browser_reload URLs only in DEBUG mode
-    urlpatterns += [
-        path("__reload__/", include("django_browser_reload.urls")),
-    ] + debug_toolbar_urls()
+    # runserver wraps StaticFilesHandler; ASGI servers (e.g. Daphne) do not.
+    urlpatterns += staticfiles_urlpatterns()
+    if "django_browser_reload" in settings.INSTALLED_APPS:
+        urlpatterns += [
+            path("__reload__/", include("django_browser_reload.urls")),
+        ]
+    if "debug_toolbar" in settings.INSTALLED_APPS:
+        from debug_toolbar.toolbar import debug_toolbar_urls
+
+        urlpatterns += debug_toolbar_urls()

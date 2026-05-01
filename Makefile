@@ -7,11 +7,17 @@ install:
 migrate:
 	uv run manage.py migrate
 
+makemigrations:
+	uv run manage.py makemigrations
+
 run:
 	uv run daphne openwhisper.asgi:application --port 8000
 
 run-debug:
 	uv run daphne openwhisper.asgi:application --port 8000 --bind 0.0.0.0 --dev
+
+run-tailwind:
+	uv run manage.py tailwind start
 
 test:
 	uv run pytest
@@ -35,3 +41,6 @@ reset-db:
 	createdb openwhisper -U postgres
 	uv run manage.py migrate
 	uv run manage.py createsuperuser --noinput --username admin --email admin@example.com
+
+collectstatic:
+	uv run manage.py collectstatic --noinput

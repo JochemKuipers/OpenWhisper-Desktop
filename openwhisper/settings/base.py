@@ -34,7 +34,8 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "daphne",
     "tailwind",
-    "theme",
+    "openwhisper.apps.theme",    
+    "openwhisper.apps.user",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -43,6 +44,12 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 ]
+
+AUTH_USER_MODEL = "user.User"
+
+# Required with django.contrib.sites: use the default Site from the sites migration (pk=1).
+# Without this, views like login resolve the site by request host and fail locally (127.0.0.1).
+SITE_ID = 1
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -161,7 +168,8 @@ LOGGING = {
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -177,4 +185,13 @@ CHANNEL_LAYERS = {
     },
 }
 
-TAILWIND_APP_NAME = "theme"
+TAILWIND_APP_NAME = "openwhisper.apps.theme"
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
