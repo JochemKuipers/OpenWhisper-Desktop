@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "tailwind",
     "openwhisper.apps.theme",
     "openwhisper.apps.user",
+    "openwhisper.apps.chat",
     "openwhisper.apps.api",
     "django.contrib.admin",
     "django.contrib.auth",

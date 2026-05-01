@@ -1,7 +1,12 @@
+from django.conf import settings
 from django.db import models
 
+
 class Chat(models.Model):
-    users: models.ManyToManyField = models.ManyToManyField("apps.user.models.User", blank=True)
+    users: models.ManyToManyField = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+    )
     created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
 
@@ -15,13 +20,19 @@ class Chat(models.Model):
         indexes = [
             models.Index(fields=["created_at"]),
         ]
-        unique_together = ["users"]
         db_table = "chats"
         app_label = "chat"
 
 class Message(models.Model):
-    chat: models.ForeignKey = models.ForeignKey("apps.chat.models.Chat", on_delete=models.CASCADE)
-    sender: models.ForeignKey = models.ForeignKey("apps.user.models.User", on_delete=models.CASCADE)
+    chat: models.ForeignKey = models.ForeignKey(
+        "chat.Chat",
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    sender: models.ForeignKey = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+    )
     content: models.TextField = models.TextField()
     created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
     updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)

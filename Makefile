@@ -44,3 +44,6 @@ reset-db:
 
 collectstatic:
 	uv run manage.py collectstatic --noinput
+
+dummy-data:
+	uv run manage.py bootstrap_dummy_data

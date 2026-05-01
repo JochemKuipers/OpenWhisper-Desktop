@@ -21,10 +21,11 @@ from django.urls import URLPattern, URLResolver, include, path
 from django.conf import settings
 
 urlpatterns: list[URLPattern | URLResolver] = [
-    path("", include("openwhisper.apps.theme.urls")),
     path("admin/", admin.site.urls),
     path("api/", include("openwhisper.apps.api.urls")),
     path("api-auth/", include("rest_framework.urls", namespace="rest_framework")),
+    # After explicit routes: "" would otherwise be tried first and break /api/* resolution.
+    path("", include("openwhisper.apps.theme.urls")),
 ]
 
 
