@@ -7,16 +7,16 @@ class UserAdmin(admin.ModelAdmin):
     list_display = [
         "username",
         "email",
-        "contact_number",
+        "phone_number",
         "is_active",
         "is_staff",
         "is_superuser",
     ]
     list_filter = ["is_active", "is_staff", "is_superuser"]
-    search_fields = ["username", "email", "contact_number"]
+    search_fields = ["username", "email", "phone_number"]
     readonly_fields = ["created_at", "updated_at"]
     fieldsets = [
-        (None, {"fields": ["username", "email", "contact_number"]}),
+        (None, {"fields": ["username", "email", "phone_number"]}),
         (
             "Profile",
             {
@@ -26,7 +26,6 @@ class UserAdmin(admin.ModelAdmin):
                     "birth_date",
                     "gender",
                     "location",
-                    "website",
                 ]
             },
         ),

@@ -40,7 +40,7 @@ reset-db:
 	dropdb --if-exists openwhisper -U postgres
 	createdb openwhisper -U postgres
 	uv run manage.py migrate
-	uv run manage.py createsuperuser --noinput --username admin --email admin@example.com
+	uv run manage.py bootstrap_superuser
 
 collectstatic:
 	uv run manage.py collectstatic --noinput

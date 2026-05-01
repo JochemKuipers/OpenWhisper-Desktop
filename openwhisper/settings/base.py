@@ -34,8 +34,9 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "daphne",
     "tailwind",
-    "openwhisper.apps.theme",    
+    "openwhisper.apps.theme",
     "openwhisper.apps.user",
+    "openwhisper.apps.api",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -190,6 +191,8 @@ TAILWIND_APP_NAME = "openwhisper.apps.theme"
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # Browsable API + /api-auth/login/ use Django sessions; JWT alone ignores the session cookie.
+        "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",

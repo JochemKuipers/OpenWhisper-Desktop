@@ -3,7 +3,7 @@ from django.contrib.auth.models import AbstractUser
 
 
 class User(AbstractUser):
-    contact_number: models.CharField = models.CharField(max_length=10, unique=True)
+    phone_number: models.CharField = models.CharField(max_length=10, null=True, blank=True)
     last_login = models.DateTimeField(auto_now=True)
 
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
@@ -31,6 +31,6 @@ class User(AbstractUser):
         indexes = [
             models.Index(fields=["created_at"]),
         ]
-        unique_together = ["username", "email", "contact_number"]
+        unique_together = ["username", "email", "phone_number"]
         db_table = "users"
         app_label = "user"

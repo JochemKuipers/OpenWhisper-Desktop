@@ -5,7 +5,7 @@ from openwhisper.apps.chat.models import Chat
 class ChatAdmin(admin.ModelAdmin):
     list_display = ["id", "get_users", "get_messages", "created_at", "updated_at"]
     list_filter = ["created_at", "updated_at"]
-    search_fields = ["users__username", "users__email", "users__contact_number", "users__first_name", "users__last_name", "users__id", "id", "messages__content", "messages__id"]
+    search_fields = ["users__username", "users__email", "users__phone_number", "users__first_name", "users__last_name", "users__id", "id", "messages__content", "messages__id"]
     readonly_fields = ["created_at", "updated_at"]
     fieldsets = [
         (None, {"fields": ["users", "messages"]}),
