@@ -26,6 +26,7 @@ from openwhisper.apps.chat.friend_social import (
     friend_request_send,
 )
 from openwhisper.apps.chat.models import Chat, Message
+from openwhisper.apps.chat.permissions import chat_admin, is_chat_admin
 from openwhisper.apps.chat.realtime import broadcast_chat_message, dispatch_social_events
 from openwhisper.apps.user.models import FriendRequest
 
@@ -33,7 +34,7 @@ User = get_user_model()
 
 
 def _chat_detail_prefetched(pk: int) -> Chat:
-    return Chat.objects.prefetch_related(
+    return Chat.objects.select_related("created_by").prefetch_related(
         "users",
         Prefetch(
             "messages",
@@ -213,7 +214,8 @@ class StartDmChatAPIView(APIView):
             )
 
         existing = (
-            Chat.objects.annotate(num_users=Count("users"))
+            Chat.objects.select_related("created_by")
+            .annotate(num_users=Count("users"))
             .filter(num_users=2, users=request.user)
             .filter(users=other)
             .prefetch_related(
@@ -228,7 +230,7 @@ class StartDmChatAPIView(APIView):
         if existing:
             return Response(ChatSerializer(existing, context={"request": request}).data)
 
-        chat = Chat.objects.create()
+        chat = Chat.objects.create(created_by=request.user)
         chat.users.add(request.user, other)
         chat = _chat_detail_prefetched(chat.pk)
         return Response(ChatSerializer(chat, context={"request": request}).data, status=status.HTTP_201_CREATED)
@@ -244,11 +246,16 @@ class ChatInviteAPIView(APIView):
         if not username:
             return Response({"detail": "username is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        chat = Chat.objects.filter(pk=chat_id).first()
+        chat = Chat.objects.select_related("created_by").filter(pk=chat_id).first()
         if chat is None:
             raise Http404()
         if not chat.users.filter(pk=request.user.pk).exists():
             return Response({"detail": "You are not a member of this chat."}, status=status.HTTP_403_FORBIDDEN)
+        if not is_chat_admin(request.user, chat):
+            return Response(
+                {"detail": "Only the chat admin can invite people."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         invitee = User.objects.filter(username__iexact=username).first()
         if invitee is None:
@@ -279,6 +286,66 @@ class ChatInviteAPIView(APIView):
         return Response(ChatSerializer(refreshed, context={"request": request}).data)
 
 
+class ChatRemoveMemberAPIView(APIView):
+    """Remove a member from a chat (admin only); notifies affected users."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, chat_id, username):
+        username = (username or "").strip()
+        if not username:
+            return Response({"detail": "username is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        chat = Chat.objects.select_related("created_by").filter(pk=chat_id).first()
+        if chat is None:
+            raise Http404()
+        if not chat.users.filter(pk=request.user.pk).exists():
+            return Response({"detail": "You are not a member of this chat."}, status=status.HTTP_403_FORBIDDEN)
+        if not is_chat_admin(request.user, chat):
+            return Response(
+                {"detail": "Only the chat admin can remove members."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        target = User.objects.filter(username__iexact=username).first()
+        if target is None:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+        if target.pk == request.user.pk:
+            return Response(
+                {"detail": "You cannot remove yourself from the chat."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        admin_user = chat_admin(chat)
+        if admin_user is not None and target.pk == admin_user.pk:
+            return Response(
+                {"detail": "Cannot remove the chat admin."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not chat.users.filter(pk=target.pk).exists():
+            return Response({"detail": "User is not in this chat."}, status=status.HTTP_400_BAD_REQUEST)
+
+        chat.users.remove(target)
+        chat.save(update_fields=["updated_at"])
+
+        refreshed = _chat_detail_prefetched(chat.pk)
+        remaining_ids = list(refreshed.users.values_list("pk", flat=True))
+        notify_ids = remaining_ids + [target.pk]
+        dispatch_social_events(
+            [(uid, {"type": "chat_updated", "chat_id": refreshed.pk}) for uid in notify_ids]
+        )
+        broadcast_chat_message(
+            chat_id=refreshed.pk,
+            payload={
+                "type": "chat.members_updated",
+                "chat_id": refreshed.pk,
+            },
+        )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class MessageViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated | permissions.IsAdminUser]
 
@@ -292,7 +359,7 @@ class ChatViewSet(viewsets.ModelViewSet):
     serializer_class = ChatSerializer
 
     def get_queryset(self):
-        qs = Chat.objects.prefetch_related(
+        qs = Chat.objects.select_related("created_by").prefetch_related(
             "users",
             Prefetch(
                 "messages",
@@ -304,12 +371,10 @@ class ChatViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
-        if instance.users.count() < 3:
+        if not is_chat_admin(request.user, instance):
             return Response(
-                {
-                    "detail": "Custom titles are only available for chats with 3 or more participants.",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+                {"detail": "Only the chat admin can change the chat name."},
+                status=status.HTTP_403_FORBIDDEN,
             )
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)

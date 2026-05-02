@@ -51,7 +51,7 @@ class Command(BaseCommand):
 
         self._reset_dummy_only_chats(list(users.values()))
 
-        chat_ab = Chat.objects.create()
+        chat_ab = Chat.objects.create(created_by=alice)
         chat_ab.users.add(alice, bob)
         Message.objects.update_or_create(
             chat=chat_ab,
@@ -64,7 +64,7 @@ class Command(BaseCommand):
             defaults={"content": "Sounds good, ping me when you're free."},
         )
 
-        chat_abc = Chat.objects.create()
+        chat_abc = Chat.objects.create(created_by=alice)
         chat_abc.users.add(alice, bob, carol)
         Message.objects.update_or_create(
             chat=chat_abc,

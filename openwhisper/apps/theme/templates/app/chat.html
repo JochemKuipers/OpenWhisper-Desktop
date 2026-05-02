@@ -49,6 +49,9 @@
                         <button type="button" id="btn-rename-chat"
                             class="hidden rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
                             title="Rename this chat">Rename</button>
+                        <button type="button" id="btn-chat-members"
+                            class="hidden shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
+                            title="People in this chat">Members</button>
                         <button type="button" id="btn-invite-chat"
                             class="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
                             title="Invite a friend to this chat">Invite</button>
@@ -99,6 +102,19 @@
             <div class="mt-4 flex justify-end gap-2">
                 <button type="button" id="rename-chat-cancel" class="rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">Cancel</button>
                 <button type="button" id="rename-chat-save" class="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-500">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat-members-modal" class="fixed inset-0 z-50 hidden" aria-modal="true" role="dialog" aria-labelledby="chat-members-modal-title">
+        <button type="button" id="chat-members-modal-backdrop" class="absolute inset-0 bg-slate-900/40" aria-label="Close dialog"></button>
+        <div class="relative mx-auto mt-[12vh] flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                <h2 id="chat-members-modal-title" class="text-lg font-semibold text-slate-900">People in this chat</h2>
+                <button type="button" id="chat-members-modal-close" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800" aria-label="Close">✕</button>
+            </div>
+            <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                <ul id="chat-members-list" class="space-y-2"></ul>
             </div>
         </div>
     </div>

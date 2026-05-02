@@ -24,6 +24,7 @@
     headerSub: document.getElementById("chat-header-sub"),
     headerAvatar: document.getElementById("chat-header-avatar"),
     btnInviteChat: document.getElementById("btn-invite-chat"),
+    btnChatMembers: document.getElementById("btn-chat-members"),
     btnRenameChat: document.getElementById("btn-rename-chat"),
     renameChatModal: document.getElementById("rename-chat-modal"),
     renameChatBackdrop: document.getElementById("rename-chat-modal-backdrop"),
@@ -35,6 +36,10 @@
     inviteModalClose: document.getElementById("invite-modal-close"),
     inviteFriendsList: document.getElementById("invite-friends-list"),
     inviteFriendsEmpty: document.getElementById("invite-friends-empty"),
+    chatMembersModal: document.getElementById("chat-members-modal"),
+    chatMembersModalBackdrop: document.getElementById("chat-members-modal-backdrop"),
+    chatMembersModalClose: document.getElementById("chat-members-modal-close"),
+    chatMembersList: document.getElementById("chat-members-list"),
     btnOpenPeople: document.getElementById("btn-open-people"),
     peopleModal: document.getElementById("people-modal"),
     peopleModalBackdrop: document.getElementById("people-modal-backdrop"),
@@ -336,10 +341,6 @@
     return participantTitle(chat);
   }
 
-  function isMultiUserChat(chat) {
-    return (chat.users || []).length >= 3;
-  }
-
   function syncChatHeader(chat) {
     if (!chat || !els.headerTitle) return;
     const title = displayChatTitle(chat);
@@ -347,9 +348,73 @@
     els.headerSub.textContent =
       (chat.users || []).length + " members · Active";
     els.headerAvatar.textContent = title.slice(0, 2).toUpperCase();
+    const memberCount = (chat.users || []).length;
+    const isAdmin = !!chat.is_admin;
     if (els.btnRenameChat) {
-      els.btnRenameChat.classList.toggle("hidden", !isMultiUserChat(chat));
+      els.btnRenameChat.classList.toggle(
+        "hidden",
+        !isAdmin || memberCount < 2,
+      );
     }
+    if (els.btnInviteChat) {
+      els.btnInviteChat.classList.toggle("hidden", !isAdmin);
+    }
+    if (els.btnChatMembers) {
+      els.btnChatMembers.classList.toggle("hidden", memberCount < 2);
+    }
+  }
+
+  function renderChatMembersPanel() {
+    if (!els.chatMembersList || !selectedChatPk) return;
+    const chat = chatsCache.find(function (c) {
+      return chatPkFromUrl(c.url) === String(selectedChatPk);
+    });
+    if (!chat) return;
+    els.chatMembersList.innerHTML = "";
+    const adminName = chat.admin_username || "";
+    const users = (chat.users || []).slice().sort(function (a, b) {
+      return String(a.username || "").localeCompare(String(b.username || ""));
+    });
+    users.forEach(function (u) {
+      const uname = u.username || "";
+      const li = document.createElement("li");
+      li.className =
+        "flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2";
+      const left = document.createElement("div");
+      left.className = "flex min-w-0 flex-wrap items-center gap-2";
+      const span = document.createElement("span");
+      span.className = "truncate text-sm font-medium text-slate-800";
+      span.textContent =
+        uname + (uname === currentUsername ? " (you)" : "");
+      left.appendChild(span);
+      if (uname === adminName) {
+        const badge = document.createElement("span");
+        badge.className =
+          "shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600";
+        badge.textContent = "Admin";
+        left.appendChild(badge);
+      }
+      li.appendChild(left);
+      const canRemove =
+        !!chat.is_admin &&
+        uname !== currentUsername &&
+        uname !== adminName;
+      if (canRemove) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className =
+          "shrink-0 rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50";
+        btn.textContent = "Remove";
+        btn.addEventListener("click", function () {
+          if (!confirm("Remove " + uname + " from this chat?")) return;
+          removeChatMember(uname).catch(function (err) {
+            alert(err.message || "Could not remove member.");
+          });
+        });
+        li.appendChild(btn);
+      }
+      els.chatMembersList.appendChild(li);
+    });
   }
 
   function lastPreview(chat) {
@@ -472,6 +537,12 @@
             return chatPkFromUrl(c.url) === String(j.chat_id);
           });
           if (ch) syncChatHeader(ch);
+          if (
+            els.chatMembersModal &&
+            !els.chatMembersModal.classList.contains("hidden")
+          ) {
+            renderChatMembersPanel();
+          }
         })
         .catch(function () {});
       return;
@@ -612,6 +683,12 @@
                 return chatPkFromUrl(c.url) === String(chatPk);
               });
               if (ch) syncChatHeader(ch);
+              if (
+                els.chatMembersModal &&
+                !els.chatMembersModal.classList.contains("hidden")
+              ) {
+                renderChatMembersPanel();
+              }
             })
             .catch(function () {});
           return;
@@ -1129,6 +1206,11 @@
     document.body.classList.remove("overflow-hidden");
   }
 
+  function closeChatMembersModal() {
+    if (els.chatMembersModal) els.chatMembersModal.classList.add("hidden");
+    document.body.classList.remove("overflow-hidden");
+  }
+
   function closeRenameChatModal() {
     if (els.renameChatModal) els.renameChatModal.classList.add("hidden");
     document.body.classList.remove("overflow-hidden");
@@ -1139,7 +1221,12 @@
     const chat = chatsCache.find(function (c) {
       return chatPkFromUrl(c.url) === String(selectedChatPk);
     });
-    if (!chat || !isMultiUserChat(chat)) return;
+    if (
+      !chat ||
+      !chat.is_admin ||
+      (chat.users || []).length < 2
+    )
+      return;
     const stored =
       chat.title != null && chat.title !== undefined ? String(chat.title).trim() : "";
     els.renameChatInput.value = stored;
@@ -1174,7 +1261,7 @@
     const chat = chatsCache.find(function (c) {
       return chatPkFromUrl(c.url) === String(selectedChatPk);
     });
-    if (!chat) return;
+    if (!chat || !chat.is_admin) return;
     els.inviteModal.classList.remove("hidden");
     document.body.classList.add("overflow-hidden");
     els.inviteFriendsList.innerHTML = "";
@@ -1247,6 +1334,38 @@
     if (ch) syncChatHeader(ch);
   }
 
+  async function removeChatMember(username) {
+    const pk = selectedChatPk;
+    if (!pk || !username) return;
+    await apiFetch(
+      "/api/chats/" +
+        encodeURIComponent(pk) +
+        "/members/" +
+        encodeURIComponent(username) +
+        "/",
+      { method: "DELETE" },
+    );
+    await loadChats();
+    renderChatMembersPanel();
+    const ch = chatsCache.find(function (c) {
+      return chatPkFromUrl(c.url) === String(pk);
+    });
+    if (ch) syncChatHeader(ch);
+    renderConversationList(els.convSearch.value);
+  }
+
+  async function openChatMembersModal() {
+    if (!els.chatMembersModal || !selectedChatPk) return;
+    await loadChats();
+    const chat = chatsCache.find(function (c) {
+      return chatPkFromUrl(c.url) === String(selectedChatPk);
+    });
+    if (!chat || (chat.users || []).length < 2) return;
+    renderChatMembersPanel();
+    els.chatMembersModal.classList.remove("hidden");
+    document.body.classList.add("overflow-hidden");
+  }
+
   initEmojiPicker();
 
   if (els.btnInviteChat)
@@ -1269,6 +1388,18 @@
     els.inviteModalClose.addEventListener("click", closeInviteModal);
   if (els.inviteModalBackdrop)
     els.inviteModalBackdrop.addEventListener("click", closeInviteModal);
+
+  if (els.btnChatMembers)
+    els.btnChatMembers.addEventListener("click", function () {
+      openChatMembersModal().catch(function () {});
+    });
+  if (els.chatMembersModalClose)
+    els.chatMembersModalClose.addEventListener("click", closeChatMembersModal);
+  if (els.chatMembersModalBackdrop)
+    els.chatMembersModalBackdrop.addEventListener(
+      "click",
+      closeChatMembersModal,
+    );
 
   if (els.btnOpenPeople)
     els.btnOpenPeople.addEventListener("click", openPeopleModal);

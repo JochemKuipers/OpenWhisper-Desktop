@@ -3,6 +3,7 @@ from asgiref.sync import async_to_sync
 from channels.db import database_sync_to_async
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
+from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from openwhisper.apps.chat.models import Chat, Message
@@ -20,7 +21,7 @@ def test_chat_websocket_receives_message_created_broadcast():
         email="ws_tester@example.com",
         password="unused-for-ws-test",
     )
-    chat = Chat.objects.create()
+    chat = Chat.objects.create(created_by=user)
     chat.users.add(user)
     token = str(RefreshToken.for_user(user).access_token)
 
@@ -171,3 +172,77 @@ def test_social_websocket_friend_remove_notifies_both():
 
     async_to_sync(ws_flow)()
     async_to_sync(assert_not_friends)()
+
+
+@pytest.mark.django_db
+def test_chat_admin_invite_rename_remove():
+    User = get_user_model()
+    alice = User.objects.create_user(username="adm_alice", email="adm_alice@example.com", password="pw")
+    bob = User.objects.create_user(username="adm_bob", email="adm_bob@example.com", password="pw")
+    carol = User.objects.create_user(username="adm_carol", email="adm_carol@example.com", password="pw")
+    alice.friends.add(bob, carol)
+    bob.friends.add(alice, carol)
+    carol.friends.add(alice, bob)
+
+    a_client = APIClient()
+    a_client.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {str(RefreshToken.for_user(alice).access_token)}"
+    )
+    b_client = APIClient()
+    b_client.credentials(HTTP_AUTHORIZATION=f"Bearer {str(RefreshToken.for_user(bob).access_token)}")
+
+    r = a_client.post("/api/chats/start/", {"username": bob.username}, format="json")
+    assert r.status_code == 201
+    pk = str(r.data["url"]).rstrip("/").split("/")[-1]
+
+    assert r.data["is_admin"] is True
+    assert r.data["admin_username"] == alice.username
+
+    r = b_client.post(f"/api/chats/{pk}/invite/", {"username": carol.username}, format="json")
+    assert r.status_code == 403
+
+    r = a_client.post(f"/api/chats/{pk}/invite/", {"username": carol.username}, format="json")
+    assert r.status_code == 200
+
+    r = b_client.patch(f"/api/chats/{pk}/", {"title": "No"}, format="json")
+    assert r.status_code == 403
+
+    r = a_client.patch(f"/api/chats/{pk}/", {"title": "Team"}, format="json")
+    assert r.status_code == 200
+
+    r = b_client.delete(f"/api/chats/{pk}/members/{carol.username}/")
+    assert r.status_code == 403
+
+    r = a_client.delete(f"/api/chats/{pk}/members/{carol.username}/")
+    assert r.status_code == 204
+
+    chat = Chat.objects.get(pk=int(pk))
+    assert not chat.users.filter(pk=carol.pk).exists()
+
+
+@pytest.mark.django_db
+def test_chat_cannot_remove_admin_or_self():
+    User = get_user_model()
+    alice = User.objects.create_user(username="rmadm_alice", email="rmadm_alice@example.com", password="pw")
+    bob = User.objects.create_user(username="rmadm_bob", email="rmadm_bob@example.com", password="pw")
+    alice.friends.add(bob)
+    bob.friends.add(alice)
+
+    a_client = APIClient()
+    a_client.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {str(RefreshToken.for_user(alice).access_token)}"
+    )
+
+    r = a_client.post("/api/chats/start/", {"username": bob.username}, format="json")
+    assert r.status_code == 201
+    pk = str(r.data["url"]).rstrip("/").split("/")[-1]
+
+    r = a_client.delete(f"/api/chats/{pk}/members/{alice.username}/")
+    assert r.status_code == 400
+
+    r = a_client.delete(f"/api/chats/{pk}/members/{bob.username}/")
+    assert r.status_code == 204
+
+    chat = Chat.objects.get(pk=int(pk))
+    assert chat.users.filter(pk=alice.pk).exists()
+    assert not chat.users.filter(pk=bob.pk).exists()

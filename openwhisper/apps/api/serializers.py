@@ -3,6 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
 from openwhisper.apps.chat.models import Chat, Message
+from openwhisper.apps.chat.permissions import chat_admin, is_chat_admin
 
 User = get_user_model()
 
@@ -95,11 +96,40 @@ class ChatSerializer(serializers.HyperlinkedModelSerializer):
     users = UserSerializer(many=True, read_only=True)
     messages = MessageSerializer(many=True, read_only=True)
     title = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    admin_username = serializers.SerializerMethodField()
+    is_admin = serializers.SerializerMethodField()
 
     class Meta:
         model = Chat
-        fields = ["url", "title", "users", "messages", "created_at", "updated_at"]
-        read_only_fields = ["url", "users", "messages", "created_at", "updated_at"]
+        fields = [
+            "url",
+            "title",
+            "users",
+            "messages",
+            "created_at",
+            "updated_at",
+            "admin_username",
+            "is_admin",
+        ]
+        read_only_fields = [
+            "url",
+            "users",
+            "messages",
+            "created_at",
+            "updated_at",
+            "admin_username",
+            "is_admin",
+        ]
+
+    def get_admin_username(self, obj):
+        admin = chat_admin(obj)
+        return admin.username if admin else None
+
+    def get_is_admin(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return is_chat_admin(request.user, obj)
 
     def validate_title(self, value):
         if value is None:
