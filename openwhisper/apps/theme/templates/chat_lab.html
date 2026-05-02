@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+
+{% block title %}Chat lab · OpenWhisper{% endblock %}
+
+{% block content %}
+    {% csrf_token %}
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-semibold text-white">Chat lab</h1>
+            <p class="mt-1 text-sm text-slate-400">JWT login, REST messages, WebSocket pushes</p>
+        </div>
+        <nav class="flex gap-3 text-sm">
+            <a href="{% url 'home' %}" class="text-slate-400 hover:text-white">Home</a>
+        </nav>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-2">
+        <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-5 shadow-xl">
+            <h2 class="text-lg font-medium text-white">Session</h2>
+            <form id="login-form" class="mt-4 flex flex-col gap-3">
+                <label class="block text-xs font-medium uppercase tracking-wide text-slate-500">Username</label>
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    autocomplete="username"
+                    class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    placeholder="dummy_alice"
+                />
+                <label class="block text-xs font-medium uppercase tracking-wide text-slate-500">Password</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    autocomplete="current-password"
+                    class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    placeholder="••••••••"
+                />
+                <button
+                    type="submit"
+                    class="mt-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+                >
+                    Get JWT &amp; load chats
+                </button>
+            </form>
+            <p id="session-status" class="mt-4 text-sm text-slate-400">Not logged in.</p>
+            <button
+                type="button"
+                id="logout-btn"
+                class="mt-3 hidden rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
+            >
+                Clear tokens
+            </button>
+        </section>
+
+        <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-5 shadow-xl">
+            <h2 class="text-lg font-medium text-white">Chat</h2>
+            <label class="mt-4 block text-xs font-medium uppercase tracking-wide text-slate-500">Active chat id</label>
+            <select
+                id="chat-select"
+                disabled
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            >
+                <option value="">Load chats after login…</option>
+            </select>
+            <div class="mt-4 flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    id="btn-connect-ws"
+                    disabled
+                    class="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                    Connect WebSocket
+                </button>
+                <button
+                    type="button"
+                    id="btn-disconnect-ws"
+                    disabled
+                    class="rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                    Disconnect
+                </button>
+                <button
+                    type="button"
+                    id="btn-load-messages"
+                    disabled
+                    class="rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                    Reload messages (REST)
+                </button>
+                <button
+                    type="button"
+                    id="btn-ping"
+                    disabled
+                    class="rounded-lg border border-amber-700 px-3 py-2 text-sm text-amber-200 hover:bg-amber-950 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                    Send ping
+                </button>
+            </div>
+            <p id="ws-status" class="mt-3 text-sm text-slate-400">WebSocket: disconnected</p>
+
+            <label class="mt-6 block text-xs font-medium uppercase tracking-wide text-slate-500">Send message (REST POST)</label>
+            <textarea
+                id="message-input"
+                rows="3"
+                disabled
+                class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                placeholder="Type a message…"
+            ></textarea>
+            <button
+                type="button"
+                id="btn-send"
+                disabled
+                class="mt-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+                Send via REST
+            </button>
+        </section>
+    </div>
+
+    <div class="mt-6 grid gap-6 lg:grid-cols-2">
+        <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-5 shadow-xl">
+            <h2 class="text-lg font-medium text-white">Messages</h2>
+            <ul id="messages-list" class="mt-4 max-h-72 space-y-2 overflow-y-auto text-sm"></ul>
+        </section>
+        <section class="rounded-xl border border-slate-800 bg-slate-900/50 p-5 shadow-xl">
+            <h2 class="text-lg font-medium text-white">WebSocket log</h2>
+            <pre id="ws-log" class="mt-4 max-h-72 overflow-y-auto rounded-lg bg-black/40 p-3 font-mono text-xs text-emerald-300"></pre>
+        </section>
+    </div>
+
+    <script>
+        (function () {
+            const STORAGE_ACCESS = "openwhisper_access";
+            const STORAGE_REFRESH = "openwhisper_refresh";
+
+            const els = {
+                loginForm: document.getElementById("login-form"),
+                username: document.getElementById("username"),
+                password: document.getElementById("password"),
+                sessionStatus: document.getElementById("session-status"),
+                logoutBtn: document.getElementById("logout-btn"),
+                chatSelect: document.getElementById("chat-select"),
+                btnConnectWs: document.getElementById("btn-connect-ws"),
+                btnDisconnectWs: document.getElementById("btn-disconnect-ws"),
+                btnLoadMessages: document.getElementById("btn-load-messages"),
+                btnPing: document.getElementById("btn-ping"),
+                wsStatus: document.getElementById("ws-status"),
+                messageInput: document.getElementById("message-input"),
+                btnSend: document.getElementById("btn-send"),
+                messagesList: document.getElementById("messages-list"),
+                wsLog: document.getElementById("ws-log"),
+                csrfInput: document.querySelector('[name="csrfmiddlewaretoken"]'),
+            };
+
+            let ws = null;
+
+            function getCookie(name) {
+                const m = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+                return m ? decodeURIComponent(m[2]) : "";
+            }
+
+            function csrfHeader() {
+                const fromInput = els.csrfInput && els.csrfInput.value;
+                const fromCookie = getCookie("csrftoken");
+                return fromInput || fromCookie || "";
+            }
+
+            function logWs(line) {
+                const t = new Date().toISOString().slice(11, 23);
+                els.wsLog.textContent += "[" + t + "] " + line + String.fromCharCode(10);
+                els.wsLog.scrollTop = els.wsLog.scrollHeight;
+            }
+
+            function getAccessToken() {
+                return sessionStorage.getItem(STORAGE_ACCESS);
+            }
+
+            function setSession(tokens, usernameLabel) {
+                sessionStorage.setItem(STORAGE_ACCESS, tokens.access);
+                sessionStorage.setItem(STORAGE_REFRESH, tokens.refresh);
+                els.sessionStatus.textContent = "Logged in as " + usernameLabel + " (JWT in sessionStorage).";
+                els.logoutBtn.classList.remove("hidden");
+                els.chatSelect.disabled = false;
+                els.btnConnectWs.disabled = false;
+                els.btnDisconnectWs.disabled = false;
+                els.btnLoadMessages.disabled = false;
+                els.btnPing.disabled = false;
+                els.messageInput.disabled = false;
+                els.btnSend.disabled = false;
+            }
+
+            function clearSession() {
+                sessionStorage.removeItem(STORAGE_ACCESS);
+                sessionStorage.removeItem(STORAGE_REFRESH);
+                disconnectWs();
+                els.sessionStatus.textContent = "Not logged in.";
+                els.logoutBtn.classList.add("hidden");
+                els.chatSelect.innerHTML = '<option value="">Load chats after login…</option>';
+                els.chatSelect.disabled = true;
+                els.btnConnectWs.disabled = true;
+                els.btnDisconnectWs.disabled = true;
+                els.btnLoadMessages.disabled = true;
+                els.btnPing.disabled = true;
+                els.messageInput.disabled = true;
+                els.btnSend.disabled = true;
+                els.messagesList.innerHTML = "";
+            }
+
+            async function apiFetch(path, options) {
+                options = options || {};
+                const headers = new Headers(options.headers || {});
+                const token = getAccessToken();
+                if (token) headers.set("Authorization", "Bearer " + token);
+                const csrftoken = csrfHeader();
+                if (csrftoken) headers.set("X-CSRFToken", csrftoken);
+                let body = options.body;
+                if (body !== undefined && body !== null && typeof body === "object" && !(body instanceof FormData)) {
+                    headers.set("Content-Type", "application/json");
+                    body = JSON.stringify(body);
+                }
+                const res = await fetch(path, {
+                    method: options.method || "GET",
+                    credentials: "same-origin",
+                    headers: headers,
+                    body: body,
+                });
+                const text = await res.text();
+                let data = null;
+                try {
+                    data = text ? JSON.parse(text) : null;
+                } catch (_) {
+                    data = text;
+                }
+                if (!res.ok) {
+                    const msg = data && data.detail ? data.detail : res.status + " " + res.statusText;
+                    throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+                }
+                return data;
+            }
+
+            async function loadChats() {
+                const raw = await apiFetch("/api/chats/", { method: "GET" });
+                const rows = Array.isArray(raw) ? raw : raw && raw.results ? raw.results : [];
+                els.chatSelect.innerHTML = "";
+                if (!rows.length) {
+                    els.chatSelect.innerHTML = '<option value="">No chats</option>';
+                    return;
+                }
+                rows.forEach(function (c) {
+                    const id = String(c.url || "").split("/").filter(Boolean).pop();
+                    const opt = document.createElement("option");
+                    opt.value = id;
+                    const names = (c.users || []).map(function (u) { return u.username; }).join(", ");
+                    opt.textContent = "Chat #" + id + (names ? " — " + names : "");
+                    els.chatSelect.appendChild(opt);
+                });
+            }
+
+            function selectedChatId() {
+                return els.chatSelect.value;
+            }
+
+            function disconnectWs() {
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                }
+                els.wsStatus.textContent = "WebSocket: disconnected";
+                els.wsStatus.className = "mt-3 text-sm text-slate-400";
+            }
+
+            function connectWs() {
+                const chatId = selectedChatId();
+                const token = getAccessToken();
+                if (!chatId || !token) return;
+                disconnectWs();
+                const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+                const url =
+                    proto +
+                    "//" +
+                    window.location.host +
+                    "/ws/chats/" +
+                    encodeURIComponent(chatId) +
+                    "/?token=" +
+                    encodeURIComponent(token);
+                logWs("Connecting… " + url.split("?")[0] + "?token=***");
+                ws = new WebSocket(url);
+                ws.onopen = function () {
+                    els.wsStatus.textContent = "WebSocket: connected (chat " + chatId + ")";
+                    els.wsStatus.className = "mt-3 text-sm text-emerald-400";
+                    logWs("open");
+                };
+                ws.onclose = function () {
+                    logWs("close");
+                    els.wsStatus.textContent = "WebSocket: disconnected";
+                    els.wsStatus.className = "mt-3 text-sm text-slate-400";
+                };
+                ws.onerror = function () {
+                    logWs("error");
+                };
+                ws.onmessage = function (ev) {
+                    logWs("message " + ev.data);
+                    try {
+                        const j = JSON.parse(ev.data);
+                        if (j.type === "message.created") {
+                            const who = j.sender_username || String(j.sender_id);
+                            appendMessageBubble(who, j.content, "(push)");
+                        }
+                    } catch (_) {}
+                };
+            }
+
+            function appendMessageBubble(senderLabel, content, tag) {
+                const li = document.createElement("li");
+                li.className = "rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-200";
+                const meta = document.createElement("span");
+                meta.className = "text-xs text-slate-500";
+                meta.textContent = "sender " + senderLabel + " " + (tag || "") + " ";
+                li.appendChild(meta);
+                const br = document.createElement("br");
+                li.appendChild(br);
+                li.appendChild(document.createTextNode(content));
+                els.messagesList.appendChild(li);
+                els.messagesList.scrollTop = els.messagesList.scrollHeight;
+            }
+
+            async function loadMessages() {
+                const chatId = selectedChatId();
+                if (!chatId) return;
+                const msgs = await apiFetch("/api/chats/" + chatId + "/messages/", { method: "GET" });
+                els.messagesList.innerHTML = "";
+                if (!msgs || !msgs.length) return;
+                msgs.slice().reverse().forEach(function (m) {
+                    const sid = m.sender && m.sender.username ? m.sender.username : "?";
+                    appendMessageBubble(sid, m.content, "(REST)");
+                });
+            }
+
+            async function sendMessage() {
+                const chatId = selectedChatId();
+                const content = els.messageInput.value.trim();
+                if (!chatId || !content) return;
+                await apiFetch("/api/chats/" + chatId + "/messages/", {
+                    method: "POST",
+                    body: { content: content },
+                });
+                els.messageInput.value = "";
+                await loadMessages();
+            }
+
+            els.loginForm.addEventListener("submit", async function (e) {
+                e.preventDefault();
+                const u = els.username.value.trim();
+                const p = els.password.value;
+                try {
+                    const tokens = await apiFetch("/api/token/", {
+                        method: "POST",
+                        body: { username: u, password: p },
+                    });
+                    setSession(tokens, u);
+                    await loadChats();
+                    els.wsLog.textContent = "";
+                    logWs("JWT obtained; chats loaded.");
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+
+            els.logoutBtn.addEventListener("click", clearSession);
+
+            els.btnConnectWs.addEventListener("click", connectWs);
+            els.btnDisconnectWs.addEventListener("click", disconnectWs);
+            els.btnLoadMessages.addEventListener("click", function () {
+                loadMessages().catch(function (err) { alert(err.message); });
+            });
+            els.btnPing.addEventListener("click", function () {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "ping" }));
+                    logWs('sent {"type":"ping"}');
+                }
+            });
+            els.btnSend.addEventListener("click", function () {
+                sendMessage().catch(function (err) { alert(err.message); });
+            });
+
+            els.chatSelect.addEventListener("change", function () {
+                disconnectWs();
+                els.messagesList.innerHTML = "";
+            });
+
+            if (getAccessToken()) {
+                els.sessionStatus.textContent = "Stored JWT found — enter password and submit to refresh, or clear tokens.";
+                els.logoutBtn.classList.remove("hidden");
+            }
+        })();
+    </script>
+{% endblock %}

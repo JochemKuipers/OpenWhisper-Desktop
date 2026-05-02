@@ -16,6 +16,7 @@ def notify_ws_on_message(sender, instance: Message, created: bool, **kwargs):
             "message_id": instance.pk,
             "chat_id": instance.chat_id,
             "sender_id": instance.sender_id,
+            "sender_username": instance.sender.username,
             "content": instance.content,
             "created_at": instance.created_at.isoformat(),
         },

@@ -41,6 +41,7 @@ def test_chat_websocket_receives_message_created_broadcast():
         assert payload["type"] == "message.created"
         assert payload["content"] == "hello realtime"
         assert payload["sender_id"] == user.pk
+        assert payload["sender_username"] == user.username
         assert payload["chat_id"] == chat.pk
 
         await communicator.disconnect()
