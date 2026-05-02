@@ -13,8 +13,19 @@
             </div>
             <nav class="flex items-center gap-3 text-sm">
                 {% if request.user.is_authenticated %}
-                <span class="hidden text-slate-500 sm:inline" aria-hidden="true">·</span>
-                <span class="max-w-[10rem] truncate font-medium text-slate-800" title="{{ request.user.username }}">{{ request.user.username }}</span>
+                <div class="flex max-w-[11rem] items-center gap-2 sm:max-w-[14rem]">
+                    {% if request.user.avatar %}
+                        <img src="{{ request.user.avatar.url }}"
+                             alt=""
+                             width="32"
+                             height="32"
+                             class="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-slate-200/80">
+                    {% else %}
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold uppercase text-blue-700 ring-1 ring-slate-200/80"
+                              aria-hidden="true">{{ request.user.username|slice:":2" }}</span>
+                    {% endif %}
+                    <span class="min-w-0 truncate font-medium text-slate-800" title="{{ request.user.username }}">{{ request.user.username }}</span>
+                </div>
                 {% endif %}
                 <a href="{% url 'account-settings' %}" class="text-slate-600 hover:text-slate-900">Settings</a>
                 <form method="post" action="{% url 'logout' %}">

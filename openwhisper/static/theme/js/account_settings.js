@@ -41,6 +41,15 @@
     const form = document.getElementById("profile-form");
     if (!form) return;
 
+    const avatarInput = document.getElementById("pf-avatar");
+    const avatarFilename = document.getElementById("pf-avatar-filename");
+    if (avatarInput && avatarFilename) {
+        avatarInput.addEventListener("change", function () {
+            const f = avatarInput.files && avatarInput.files[0];
+            avatarFilename.textContent = f ? f.name : "No file chosen";
+        });
+    }
+
     loadProfile().catch(function () {
         showStatus("err", "Failed to load profile.");
     });
