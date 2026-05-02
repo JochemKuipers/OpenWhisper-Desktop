@@ -1,0 +1,68 @@
+{% extends "base_marketing.html" %}
+{% load static %}
+
+{% block title %}OpenWhisper — Private messaging with Django &amp; WebSockets{% endblock %}
+{% block meta_description %}OpenWhisper combines a Django REST API, JWT and session auth, Redis-backed WebSockets, and a fast Tailwind UI for real-time conversations you control.{% endblock %}
+{% block og_title %}OpenWhisper — Private messaging{% endblock %}
+{% block og_description %}Real-time chat on a modern Django stack: REST, Channels, SimpleJWT, and a lightweight web client.{% endblock %}
+{% block twitter_title %}OpenWhisper — Private messaging{% endblock %}
+{% block twitter_description %}Real-time messaging with Django, WebSockets, and a privacy-first mindset.{% endblock %}
+
+{% block content %}
+    <section class="mx-auto max-w-6xl px-4 py-16 text-center">
+        <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">Messaging you can ship and audit</h1>
+        <p class="mx-auto mt-6 max-w-2xl text-lg text-slate-600">
+            OpenWhisper is an open, self-hostable foundation for private chat: PostgreSQL for history, Redis for real-time fan-out,
+            and clear API boundaries so your data stays on your infrastructure.
+        </p>
+        <div class="mt-10 flex flex-wrap justify-center gap-4">
+            {% if user.is_authenticated %}
+                <a href="{% url 'chat-app' %}" class="rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-500">
+                    Go to messages
+                </a>
+            {% else %}
+                <a href="{% url 'register' %}" class="rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-500">
+                    Create account
+                </a>
+                <a href="{% url 'login' %}" class="rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+                    Sign in
+                </a>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="border-y border-slate-200 bg-white py-16">
+        <div class="mx-auto grid max-w-6xl gap-12 px-4 md:grid-cols-3">
+            <article>
+                <h2 class="text-lg font-semibold text-slate-900">Own your stack</h2>
+                <p class="mt-3 text-sm leading-relaxed text-slate-600">
+                    Run API, workers, and database where you trust them—no opaque SaaS dependency for core messaging flows.
+                </p>
+            </article>
+            <article>
+                <h2 class="text-lg font-semibold text-slate-900">Real-time by default</h2>
+                <p class="mt-3 text-sm leading-relaxed text-slate-600">
+                    Django Channels pushes new messages over WebSockets so clients update instantly without noisy polling.
+                </p>
+            </article>
+            <article>
+                <h2 class="text-lg font-semibold text-slate-900">Clear auth story</h2>
+                <p class="mt-3 text-sm leading-relaxed text-slate-600">
+                    Browser sessions protect HTML routes; JWT powers API and sockets—aligned patterns for web and native clients later.
+                </p>
+            </article>
+        </div>
+    </section>
+
+    <section class="mx-auto max-w-6xl px-4 py-16 text-center">
+        <h2 class="text-2xl font-semibold text-slate-900">Ready to try it?</h2>
+        <p class="mx-auto mt-3 max-w-xl text-slate-600">
+            Register a local account, open the web app, and send messages across tabs—the fastest way to validate your deployment.
+        </p>
+        {% if not user.is_authenticated %}
+            <a href="{% url 'register' %}" class="mt-8 inline-block rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">
+                Get started
+            </a>
+        {% endif %}
+    </section>
+{% endblock %}
