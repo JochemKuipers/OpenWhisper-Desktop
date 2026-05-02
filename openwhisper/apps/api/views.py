@@ -19,7 +19,14 @@ from openwhisper.apps.api.serializers import (
     UserProfileSerializer,
     UserSerializer,
 )
+from openwhisper.apps.chat.friend_social import (
+    friend_request_accept,
+    friend_request_cancel,
+    friend_request_send,
+)
 from openwhisper.apps.chat.models import Chat, Message
+from openwhisper.apps.chat.realtime import dispatch_social_events
+from openwhisper.apps.user.models import FriendRequest
 
 User = get_user_model()
 
@@ -81,6 +88,8 @@ class UserSearchAPIView(APIView):
 
 
 class MeFriendsAPIView(APIView):
+    """Accepted friends only (symmetric M2M)."""
+
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -88,16 +97,74 @@ class MeFriendsAPIView(APIView):
         ser = PublicUserMiniSerializer(friends, many=True)
         return Response(ser.data)
 
+
+class FriendRequestsAPIView(APIView):
+    """List pending requests or send a new one."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        incoming_qs = FriendRequest.objects.filter(to_user=request.user).select_related("from_user").order_by("-created_at")
+        outgoing_qs = FriendRequest.objects.filter(from_user=request.user).select_related("to_user").order_by("-created_at")
+        incoming_users = [r.from_user for r in incoming_qs]
+        outgoing_users = [r.to_user for r in outgoing_qs]
+        return Response(
+            {
+                "incoming": PublicUserMiniSerializer(incoming_users, many=True).data,
+                "outgoing": PublicUserMiniSerializer(outgoing_users, many=True).data,
+            }
+        )
+
     def post(self, request):
         username = (request.data.get("username") or "").strip()
-        if not username:
-            return Response({"detail": "username is required."}, status=status.HTTP_400_BAD_REQUEST)
-        if username.lower() == request.user.username.lower():
-            return Response({"detail": "You cannot add yourself."}, status=status.HTTP_400_BAD_REQUEST)
+        ok, err, events = friend_request_send(request.user, username)
+        if not ok:
+            st = (
+                status.HTTP_404_NOT_FOUND
+                if err == "User not found."
+                else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"detail": err}, status=st)
+        dispatch_social_events(events)
         other = get_object_or_404(User, username__iexact=username)
-        request.user.friends.add(other)
         ser = PublicUserMiniSerializer(other)
         return Response(ser.data, status=status.HTTP_201_CREATED)
+
+
+class FriendRequestAcceptAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, username):
+        ok, err, events = friend_request_accept(request.user, username)
+        if not ok:
+            st = (
+                status.HTTP_404_NOT_FOUND
+                if err in ("User not found.", "No pending friend request from this user.")
+                else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"detail": err}, status=st)
+        dispatch_social_events(events)
+        other = get_object_or_404(User, username__iexact=username.strip())
+        ser = PublicUserMiniSerializer(other)
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+
+class FriendRequestCancelAPIView(APIView):
+    """Cancel an outgoing request or decline an incoming one."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, username):
+        ok, err, events = friend_request_cancel(request.user, username)
+        if not ok:
+            st = (
+                status.HTTP_404_NOT_FOUND
+                if err in ("User not found.", "No pending friend request with this user.")
+                else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"detail": err}, status=st)
+        dispatch_social_events(events)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class MeFriendDetailAPIView(APIView):
@@ -123,7 +190,7 @@ class StartDmChatAPIView(APIView):
             return Response({"detail": "Cannot start a chat with yourself."}, status=status.HTTP_400_BAD_REQUEST)
         if not request.user.friends.filter(pk=other.pk).exists():
             return Response(
-                {"detail": "You can only start a chat with someone on your friends list."},
+                {"detail": "You can only chat with accepted friends."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 

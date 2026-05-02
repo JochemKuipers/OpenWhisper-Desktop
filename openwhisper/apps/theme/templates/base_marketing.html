@@ -1,24 +1,27 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block extra_head %}
-    <meta name="description" content="{% block meta_description %}OpenWhisper is a privacy-minded messaging stack: Django API, real-time Channels, and modern web UI.{% endblock %}">
+    <meta name="description"
+          content="{% block meta_description %}OpenWhisper is a privacy-minded messaging stack: Django API, real-time Channels, and modern web UI.{% endblock %}">
     <link rel="canonical" href="{{ request.build_absolute_uri }}">
-    <meta name="robots" content="{% block meta_robots %}index,follow{% endblock %}">
-
+    <meta name="robots"
+          content="{% block meta_robots %}index,follow{% endblock %}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.build_absolute_uri }}">
-    <meta property="og:title" content="{% block og_title %}OpenWhisper{% endblock %}">
-    <meta property="og:description" content="{% block og_description %}Privacy-focused messaging built with Django, WebSockets, and Tailwind CSS.{% endblock %}">
+    <meta property="og:title"
+          content="{% block og_title %}OpenWhisper{% endblock %}">
+    <meta property="og:description"
+          content="{% block og_description %}Privacy-focused messaging built with Django, WebSockets, and Tailwind CSS.{% endblock %}">
     <meta property="og:site_name" content="OpenWhisper">
     {% block og_image %}
-        <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'theme/img/openwhisper-og.svg' %}">
+        <meta property="og:image"
+              content="{{ request.scheme }}://{{ request.get_host }}{% static 'theme/img/openwhisper-og.svg' %}">
     {% endblock %}
-
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="{% block twitter_title %}OpenWhisper{% endblock %}">
-    <meta name="twitter:description" content="{% block twitter_description %}Privacy-focused messaging built with Django and real-time WebSockets.{% endblock %}">
-
+    <meta name="twitter:title"
+          content="{% block twitter_title %}OpenWhisper{% endblock %}">
+    <meta name="twitter:description"
+          content="{% block twitter_description %}Privacy-focused messaging built with Django and real-time WebSockets.{% endblock %}">
     {% block json_ld %}
         <script type="application/ld+json">
             {
@@ -39,23 +42,26 @@
         </script>
     {% endblock %}
 {% endblock %}
-
 {% block body %}
     <div class="flex min-h-screen flex-col">
         <header class="border-b border-slate-200 bg-white">
             <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
-                <a href="{% url 'landing' %}" class="text-lg font-semibold text-slate-900">OpenWhisper</a>
+                <a href="{% url 'landing' %}"
+                   class="text-lg font-semibold text-slate-900">OpenWhisper</a>
                 <nav class="flex flex-wrap items-center gap-3 text-sm font-medium">
                     {% if user.is_authenticated %}
-                        <a href="{% url 'chat-app' %}" class="rounded-lg bg-blue-600 px-3 py-2 text-white hover:bg-blue-500">Open app</a>
-                        <a href="{% url 'account-settings' %}" class="text-slate-600 hover:text-slate-900">Settings</a>
+                        <a href="{% url 'chat-app' %}"
+                           class="rounded-lg bg-blue-600 px-3 py-2 text-white hover:bg-blue-500">Open app</a>
+                        <a href="{% url 'account-settings' %}"
+                           class="text-slate-600 hover:text-slate-900">Settings</a>
                         <form method="post" action="{% url 'logout' %}" class="inline">
                             {% csrf_token %}
                             <button type="submit" class="text-slate-600 hover:text-slate-900">Log out</button>
                         </form>
                     {% else %}
                         <a href="{% url 'login' %}" class="text-slate-600 hover:text-slate-900">Log in</a>
-                        <a href="{% url 'register' %}" class="rounded-lg bg-blue-600 px-3 py-2 text-white hover:bg-blue-500">Register</a>
+                        <a href="{% url 'register' %}"
+                           class="rounded-lg bg-blue-600 px-3 py-2 text-white hover:bg-blue-500">Register</a>
                     {% endif %}
                 </nav>
             </div>

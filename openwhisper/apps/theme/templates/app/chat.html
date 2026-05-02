@@ -87,12 +87,21 @@
                 <button type="button" id="people-modal-close" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800" aria-label="Close">✕</button>
             </div>
             <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                <label for="people-search" class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Find people</label>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Incoming requests</h3>
+                <p id="incoming-requests-empty" class="mt-2 text-sm text-slate-500">No incoming requests.</p>
+                <ul id="incoming-requests-list" class="mt-2 hidden space-y-2"></ul>
+
+                <h3 class="mt-8 text-xs font-semibold uppercase tracking-wide text-slate-500">Outgoing requests</h3>
+                <p id="outgoing-requests-empty" class="mt-2 text-sm text-slate-500">No outgoing requests.</p>
+                <ul id="outgoing-requests-list" class="mt-2 hidden space-y-2"></ul>
+
+                <label for="people-search" class="mt-8 block text-xs font-semibold uppercase tracking-wide text-slate-500">Find people</label>
                 <input type="search" id="people-search" placeholder="Search by username (min. 2 characters)…" autocomplete="off"
                     class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 <ul id="people-search-results" class="mt-3 space-y-2"></ul>
+
                 <h3 class="mt-8 text-xs font-semibold uppercase tracking-wide text-slate-500">Your friends</h3>
-                <p id="friends-empty" class="mt-2 hidden text-sm text-slate-500">No friends yet — search above and add someone.</p>
+                <p id="friends-empty" class="mt-2 hidden text-sm text-slate-500">No friends yet — send a request from search, then chat once they accept.</p>
                 <ul id="friends-list" class="mt-2 space-y-2"></ul>
             </div>
         </div>

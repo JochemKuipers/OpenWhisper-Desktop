@@ -34,3 +34,36 @@ class User(AbstractUser):
         unique_together = ["username", "email", "phone_number"]
         db_table = "users"
         app_label = "user"
+
+
+class FriendRequest(models.Model):
+    """Pending invitation before symmetric friendship is established."""
+
+    from_user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="friend_requests_sent",
+    )
+    to_user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="friend_requests_received",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "user_friend_requests"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["from_user", "to_user"],
+                name="unique_friend_request_direction",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["to_user", "-created_at"]),
+            models.Index(fields=["from_user", "-created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.from_user_id} → {self.to_user_id}"

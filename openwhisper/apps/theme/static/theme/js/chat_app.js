@@ -31,13 +31,27 @@
     peopleSearchResults: document.getElementById("people-search-results"),
     friendsList: document.getElementById("friends-list"),
     friendsEmpty: document.getElementById("friends-empty"),
+    incomingRequestsList: document.getElementById("incoming-requests-list"),
+    incomingRequestsEmpty: document.getElementById("incoming-requests-empty"),
+    outgoingRequestsList: document.getElementById("outgoing-requests-list"),
+    outgoingRequestsEmpty: document.getElementById("outgoing-requests-empty"),
   };
 
   let chatsCache = [];
   let selectedChatPk = null;
   let ws = null;
+  let socialWs = null;
+  let socialReconnectTimer = null;
+  let socialOpSeq = 0;
+  const pendingSocialAcks = {};
   let friendsUsernames = new Set();
+  let incomingFromUsernames = new Set();
+  let outgoingToUsernames = new Set();
   let searchDebounceTimer = null;
+  /** Bumps on each runPeopleSearch start so overlapping awaits cannot append twice. */
+  let peopleSearchSeq = 0;
+  let cachedPeopleSearchQuery = "";
+  let cachedPeopleSearchRows = null;
 
   function getCsrf() {
     const inp = document.querySelector('[name="csrfmiddlewaretoken"]');
@@ -382,6 +396,140 @@
     }
   }
 
+  function rejectAllSocialPending(message) {
+    Object.keys(pendingSocialAcks).forEach(function (k) {
+      const p = pendingSocialAcks[k];
+      if (!p) return;
+      delete pendingSocialAcks[k];
+      clearTimeout(p.timeoutId);
+      p.reject(new Error(message));
+    });
+  }
+
+  function applySocialNotification(j) {
+    const t = j.type;
+    if (t === "friend_request_received") {
+      incomingFromUsernames.add(j.username);
+    } else if (t === "friend_request_sent") {
+      outgoingToUsernames.add(j.username);
+    } else if (t === "friend_request_accepted") {
+      incomingFromUsernames.delete(j.username);
+      outgoingToUsernames.delete(j.username);
+      friendsUsernames.add(j.username);
+      loadChats().catch(function () {});
+    } else if (t === "friend_request_removed") {
+      incomingFromUsernames.delete(j.username);
+      outgoingToUsernames.delete(j.username);
+    } else {
+      return;
+    }
+    if (
+      els.peopleModal &&
+      !els.peopleModal.classList.contains("hidden")
+    ) {
+      refreshPeoplePanels();
+      refreshPeopleSearchDomOnly();
+    }
+  }
+
+  function connectSocialWs() {
+    const token = getAccess();
+    if (!token) return;
+    if (socialWs && socialWs.readyState === WebSocket.OPEN) return;
+    if (socialWs && socialWs.readyState === WebSocket.CONNECTING) return;
+    if (socialWs) {
+      socialWs.onclose = null;
+      socialWs.close();
+      socialWs = null;
+    }
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const url =
+      proto +
+      "//" +
+      window.location.host +
+      "/ws/social/?token=" +
+      encodeURIComponent(token);
+    socialWs = new WebSocket(url);
+    socialWs.onmessage = function (ev) {
+      try {
+        const j = JSON.parse(ev.data);
+        if (j.type === "social_ack") {
+          const pending = pendingSocialAcks[j.op_id];
+          if (pending) {
+            delete pendingSocialAcks[j.op_id];
+            clearTimeout(pending.timeoutId);
+            if (j.ok) pending.resolve(j);
+            else pending.reject(new Error(j.detail || "Request failed."));
+          }
+          return;
+        }
+        applySocialNotification(j);
+      } catch (_) {
+        /* ignore */
+      }
+    };
+    socialWs.onclose = function () {
+      socialWs = null;
+      rejectAllSocialPending("Connection closed.");
+      if (!getAccess()) return;
+      if (socialReconnectTimer) clearTimeout(socialReconnectTimer);
+      socialReconnectTimer = setTimeout(function () {
+        socialReconnectTimer = null;
+        connectSocialWs();
+      }, 2500);
+    };
+  }
+
+  function ensureSocialWsConnected() {
+    return new Promise(function (resolve, reject) {
+      const token = getAccess();
+      if (!token) {
+        reject(new Error("Not signed in."));
+        return;
+      }
+      if (socialWs && socialWs.readyState === WebSocket.OPEN) {
+        resolve();
+        return;
+      }
+      connectSocialWs();
+      let n = 0;
+      const iv = setInterval(function () {
+        n++;
+        if (socialWs && socialWs.readyState === WebSocket.OPEN) {
+          clearInterval(iv);
+          resolve();
+        } else if (n > 200) {
+          clearInterval(iv);
+          reject(new Error("Social socket failed to connect."));
+        }
+      }, 50);
+    });
+  }
+
+  function socialRpc(action, fields) {
+    return ensureSocialWsConnected().then(function () {
+      return new Promise(function (resolve, reject) {
+        const op_id = ++socialOpSeq;
+        const timeoutId = setTimeout(function () {
+          if (pendingSocialAcks[op_id]) {
+            delete pendingSocialAcks[op_id];
+            reject(new Error("Request timed out."));
+          }
+        }, 15000);
+        pendingSocialAcks[op_id] = {
+          resolve: resolve,
+          reject: reject,
+          timeoutId: timeoutId,
+        };
+        socialWs.send(
+          JSON.stringify(
+            Object.assign({ action: action, op_id: op_id }, fields || {}),
+          ),
+        );
+      });
+    });
+  }
+
   function connectWs(chatPk) {
     disconnectWs();
     const token = getAccess();
@@ -540,6 +688,128 @@
     );
   }
 
+  async function loadFriendRequests() {
+    const data = await apiFetch("/api/users/me/friend-requests/", {
+      method: "GET",
+    });
+    incomingFromUsernames = new Set(
+      (data.incoming || []).map(function (r) {
+        return r.username;
+      }),
+    );
+    outgoingToUsernames = new Set(
+      (data.outgoing || []).map(function (r) {
+        return r.username;
+      }),
+    );
+  }
+
+  function renderIncomingRequests() {
+    if (!els.incomingRequestsList || !els.incomingRequestsEmpty) return;
+    els.incomingRequestsList.innerHTML = "";
+    const names = Array.from(incomingFromUsernames).sort();
+    if (!names.length) {
+      els.incomingRequestsEmpty.classList.remove("hidden");
+      els.incomingRequestsList.classList.add("hidden");
+      return;
+    }
+    els.incomingRequestsEmpty.classList.add("hidden");
+    els.incomingRequestsList.classList.remove("hidden");
+    names.forEach(function (uname) {
+      const li = document.createElement("li");
+      li.className =
+        "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2";
+
+      const span = document.createElement("span");
+      span.className = "text-sm font-medium text-slate-800";
+      span.textContent = uname;
+
+      const actions = document.createElement("div");
+      actions.className = "flex shrink-0 gap-1";
+
+      const btnAccept = document.createElement("button");
+      btnAccept.type = "button";
+      btnAccept.className =
+        "rounded-lg bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-500";
+      btnAccept.textContent = "Accept";
+      btnAccept.addEventListener("click", function () {
+        acceptFriendRequest(uname).catch(function (err) {
+          alert(err.message || "Could not accept.");
+        });
+      });
+
+      const btnDecline = document.createElement("button");
+      btnDecline.type = "button";
+      btnDecline.className =
+        "rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50";
+      btnDecline.textContent = "Decline";
+      btnDecline.addEventListener("click", function () {
+        cancelFriendRequest(uname).catch(function (err) {
+          alert(err.message || "Could not decline.");
+        });
+      });
+
+      actions.appendChild(btnAccept);
+      actions.appendChild(btnDecline);
+      li.appendChild(span);
+      li.appendChild(actions);
+      els.incomingRequestsList.appendChild(li);
+    });
+  }
+
+  function renderOutgoingRequests() {
+    if (!els.outgoingRequestsList || !els.outgoingRequestsEmpty) return;
+    els.outgoingRequestsList.innerHTML = "";
+    const names = Array.from(outgoingToUsernames).sort();
+    if (!names.length) {
+      els.outgoingRequestsEmpty.classList.remove("hidden");
+      els.outgoingRequestsList.classList.add("hidden");
+      return;
+    }
+    els.outgoingRequestsEmpty.classList.add("hidden");
+    els.outgoingRequestsList.classList.remove("hidden");
+    names.forEach(function (uname) {
+      const li = document.createElement("li");
+      li.className =
+        "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2";
+
+      const span = document.createElement("span");
+      span.className = "truncate text-sm font-medium text-slate-800";
+      span.textContent = uname;
+
+      const btnCancel = document.createElement("button");
+      btnCancel.type = "button";
+      btnCancel.className =
+        "shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100";
+      btnCancel.textContent = "Cancel";
+      btnCancel.title = "Withdraw friend request";
+      btnCancel.addEventListener("click", function () {
+        cancelFriendRequest(uname).catch(function (err) {
+          alert(err.message || "Could not cancel.");
+        });
+      });
+
+      const pending = document.createElement("span");
+      pending.className = "text-xs text-slate-500";
+      pending.textContent = "Pending";
+
+      const actions = document.createElement("div");
+      actions.className = "flex shrink-0 items-center gap-2";
+      actions.appendChild(pending);
+      actions.appendChild(btnCancel);
+
+      li.appendChild(span);
+      li.appendChild(actions);
+      els.outgoingRequestsList.appendChild(li);
+    });
+  }
+
+  function refreshPeoplePanels() {
+    renderIncomingRequests();
+    renderOutgoingRequests();
+    renderFriendsList();
+  }
+
   function closePeopleModal() {
     if (els.peopleModal) els.peopleModal.classList.add("hidden");
     document.body.classList.remove("overflow-hidden");
@@ -551,10 +821,12 @@
     document.body.classList.add("overflow-hidden");
     if (els.peopleSearch) els.peopleSearch.value = "";
     if (els.peopleSearchResults) els.peopleSearchResults.innerHTML = "";
-    loadFriendsUsernames()
-      .then(renderFriendsList)
+    cachedPeopleSearchQuery = "";
+    cachedPeopleSearchRows = null;
+    Promise.all([loadFriendsUsernames(), loadFriendRequests()])
+      .then(refreshPeoplePanels)
       .catch(function (e) {
-        alert(e.message || "Could not load friends.");
+        alert(e.message || "Could not load people.");
       });
     if (els.peopleSearch) els.peopleSearch.focus();
   }
@@ -613,52 +885,39 @@
       { method: "DELETE" },
     );
     await loadFriendsUsernames();
-    renderFriendsList();
-    await runPeopleSearch();
+    await loadFriendRequests();
+    refreshPeoplePanels();
+    refreshPeopleSearchDomOnly();
   }
 
-  async function addFriend(username) {
-    await apiFetch("/api/users/me/friends/", {
-      method: "POST",
-      body: { username: username },
-    });
-    await loadFriendsUsernames();
-    renderFriendsList();
-    await runPeopleSearch();
+  function sendFriendRequest(username) {
+    return socialRpc("friend_request_send", { username: username });
   }
 
-  async function openOrSelectDm(username) {
-    try {
-      const chat = await apiFetch("/api/chats/start/", {
-        method: "POST",
-        body: { username: username },
-      });
-      await loadChats();
-      closePeopleModal();
-      const pk = chatPkFromUrl(chat.url);
-      if (pk) await selectChat(pk);
-    } catch (e) {
-      alert(e.message || "Could not start chat.");
-    }
+  function acceptFriendRequest(username) {
+    return socialRpc("friend_request_accept", { username: username });
   }
 
-  async function runPeopleSearch() {
+  function cancelFriendRequest(username) {
+    return socialRpc("friend_request_cancel", { username: username });
+  }
+
+  function refreshPeopleSearchDomOnly() {
     if (!els.peopleSearch || !els.peopleSearchResults) return;
     const q = els.peopleSearch.value.trim();
-    els.peopleSearchResults.innerHTML = "";
-    if (q.length < 2) return;
-    let rows;
-    try {
-      rows = await apiFetch("/api/users/search/?q=" + encodeURIComponent(q), {
-        method: "GET",
-      });
-    } catch (e) {
-      const errLi = document.createElement("li");
-      errLi.className = "text-sm text-red-600";
-      errLi.textContent = e.message || "Search failed.";
-      els.peopleSearchResults.appendChild(errLi);
+    if (
+      q.length < 2 ||
+      q !== cachedPeopleSearchQuery ||
+      cachedPeopleSearchRows === null
+    ) {
       return;
     }
+    renderPeopleSearchRows(cachedPeopleSearchRows);
+  }
+
+  function renderPeopleSearchRows(rows) {
+    if (!els.peopleSearchResults) return;
+    els.peopleSearchResults.innerHTML = "";
     if (!rows || !rows.length) {
       const li = document.createElement("li");
       li.className = "text-sm text-slate-500";
@@ -680,19 +939,60 @@
       actions.className = "flex shrink-0 gap-1";
 
       const isFriend = friendsUsernames.has(uname);
+      const incoming = incomingFromUsernames.has(uname);
+      const outgoing = outgoingToUsernames.has(uname);
 
-      if (!isFriend) {
-        const btnAdd = document.createElement("button");
-        btnAdd.type = "button";
-        btnAdd.className =
-          "rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100";
-        btnAdd.textContent = "Add friend";
-        btnAdd.addEventListener("click", function () {
-          addFriend(uname).catch(function (err) {
-            alert(err.message || "Could not add friend.");
+      if (!isFriend && incoming) {
+        const btnAccept = document.createElement("button");
+        btnAccept.type = "button";
+        btnAccept.className =
+          "rounded-lg bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-500";
+        btnAccept.textContent = "Accept";
+        btnAccept.addEventListener("click", function () {
+          acceptFriendRequest(uname).catch(function (err) {
+            alert(err.message || "Could not accept.");
           });
         });
-        actions.appendChild(btnAdd);
+        const btnDecline = document.createElement("button");
+        btnDecline.type = "button";
+        btnDecline.className =
+          "rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50";
+        btnDecline.textContent = "Decline";
+        btnDecline.addEventListener("click", function () {
+          cancelFriendRequest(uname).catch(function (err) {
+            alert(err.message || "Could not decline.");
+          });
+        });
+        actions.appendChild(btnAccept);
+        actions.appendChild(btnDecline);
+      } else if (!isFriend && outgoing) {
+        const lbl = document.createElement("span");
+        lbl.className = "rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600";
+        lbl.textContent = "Request sent";
+        const btnCancel = document.createElement("button");
+        btnCancel.type = "button";
+        btnCancel.className =
+          "rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-white";
+        btnCancel.textContent = "Cancel";
+        btnCancel.addEventListener("click", function () {
+          cancelFriendRequest(uname).catch(function (err) {
+            alert(err.message || "Could not cancel.");
+          });
+        });
+        actions.appendChild(lbl);
+        actions.appendChild(btnCancel);
+      } else if (!isFriend) {
+        const btnReq = document.createElement("button");
+        btnReq.type = "button";
+        btnReq.className =
+          "rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100";
+        btnReq.textContent = "Send request";
+        btnReq.addEventListener("click", function () {
+          sendFriendRequest(uname).catch(function (err) {
+            alert(err.message || "Could not send request.");
+          });
+        });
+        actions.appendChild(btnReq);
       }
 
       const btnChat = document.createElement("button");
@@ -704,7 +1004,10 @@
           : "cursor-not-allowed bg-slate-300");
       btnChat.textContent = "Chat";
       btnChat.disabled = !isFriend;
-      btnChat.title = isFriend ? "Open direct chat" : "Add as friend first";
+      if (isFriend) btnChat.title = "Open direct chat";
+      else if (incoming) btnChat.title = "Accept their request to chat";
+      else if (outgoing) btnChat.title = "Wait until they accept";
+      else btnChat.title = "Send a friend request first";
       if (isFriend) {
         btnChat.addEventListener("click", function () {
           openOrSelectDm(uname);
@@ -716,6 +1019,48 @@
       li.appendChild(actions);
       els.peopleSearchResults.appendChild(li);
     });
+  }
+
+  async function openOrSelectDm(username) {
+    try {
+      const chat = await apiFetch("/api/chats/start/", {
+        method: "POST",
+        body: { username: username },
+      });
+      await loadChats();
+      closePeopleModal();
+      const pk = chatPkFromUrl(chat.url);
+      if (pk) await selectChat(pk);
+    } catch (e) {
+      alert(e.message || "Could not start chat.");
+    }
+  }
+
+  async function runPeopleSearch() {
+    if (!els.peopleSearch || !els.peopleSearchResults) return;
+    const seq = ++peopleSearchSeq;
+    const q = els.peopleSearch.value.trim();
+    els.peopleSearchResults.innerHTML = "";
+    cachedPeopleSearchQuery = "";
+    cachedPeopleSearchRows = null;
+    if (q.length < 2) return;
+    let rows;
+    try {
+      rows = await apiFetch("/api/users/search/?q=" + encodeURIComponent(q), {
+        method: "GET",
+      });
+    } catch (e) {
+      if (seq !== peopleSearchSeq) return;
+      const errLi = document.createElement("li");
+      errLi.className = "text-sm text-red-600";
+      errLi.textContent = e.message || "Search failed.";
+      els.peopleSearchResults.appendChild(errLi);
+      return;
+    }
+    if (seq !== peopleSearchSeq) return;
+    cachedPeopleSearchQuery = q;
+    cachedPeopleSearchRows = Array.isArray(rows) ? rows : [];
+    renderPeopleSearchRows(cachedPeopleSearchRows);
   }
 
   initEmojiPicker();
@@ -736,7 +1081,10 @@
   }
 
   bootstrapSessionJwt()
-    .then(loadChats)
+    .then(function () {
+      connectSocialWs();
+      return loadChats();
+    })
     .catch(function (err) {
       console.error(err);
       alert("Could not start messaging session. Try signing in again.");

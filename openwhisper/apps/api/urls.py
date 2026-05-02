@@ -6,6 +6,9 @@ from openwhisper.apps.api.views import (
     ChatMessagesAPIView,
     ChatViewSet,
     CurrentUserAPIView,
+    FriendRequestAcceptAPIView,
+    FriendRequestCancelAPIView,
+    FriendRequestsAPIView,
     LogoutAPIView,
     MeFriendDetailAPIView,
     MeFriendsAPIView,
@@ -25,6 +28,17 @@ router.register(r"messages", MessageViewSet, basename="message")
 urlpatterns = [
     path("auth/session-token/", SessionTokenAPIView.as_view(), name="api-session-token"),
     path("users/search/", UserSearchAPIView.as_view(), name="user-search"),
+    path(
+        "users/me/friend-requests/<str:username>/accept/",
+        FriendRequestAcceptAPIView.as_view(),
+        name="friend-request-accept",
+    ),
+    path(
+        "users/me/friend-requests/<str:username>/",
+        FriendRequestCancelAPIView.as_view(),
+        name="friend-request-cancel",
+    ),
+    path("users/me/friend-requests/", FriendRequestsAPIView.as_view(), name="friend-requests"),
     path("users/me/friends/<str:username>/", MeFriendDetailAPIView.as_view(), name="me-friend-detail"),
     path("users/me/friends/", MeFriendsAPIView.as_view(), name="me-friends"),
     path("users/me/", CurrentUserAPIView.as_view(), name="current-user"),
