@@ -5,6 +5,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth.models import AnonymousUser
 
 from openwhisper.apps.chat.friend_social import (
+    friend_remove,
     friend_request_accept,
     friend_request_cancel,
     friend_request_send,
@@ -13,7 +14,7 @@ from openwhisper.apps.chat.models import Chat
 
 
 class SocialConsumer(AsyncWebsocketConsumer):
-    """Per-user notifications: friend requests over WebSockets (?token= JWT)."""
+    """Per-user social channel: friend requests + unfriend (?token= JWT)."""
 
     async def connect(self):
         user = self.scope["user"]
@@ -60,6 +61,8 @@ class SocialConsumer(AsyncWebsocketConsumer):
             runner = friend_request_accept
         elif action == "friend_request_cancel":
             runner = friend_request_cancel
+        elif action == "friend_remove":
+            runner = friend_remove
 
         if runner is None:
             if op_id is not None:

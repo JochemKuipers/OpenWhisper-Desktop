@@ -116,3 +116,58 @@ def test_social_websocket_friend_send_and_accept_via_ws():
 
     async_to_sync(ws_flow)()
     async_to_sync(assert_friends)()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_social_websocket_friend_remove_notifies_both():
+    """Removing a friend unfriends symmetrically and notifies both sockets."""
+    from openwhisper.asgi import application
+
+    User = get_user_model()
+    alice = User.objects.create_user(
+        username="rm_alice",
+        email="rm_alice@example.com",
+        password="pw",
+    )
+    bob = User.objects.create_user(
+        username="rm_bob",
+        email="rm_bob@example.com",
+        password="pw",
+    )
+    alice.friends.add(bob)
+
+    tok_a = str(RefreshToken.for_user(alice).access_token)
+    tok_b = str(RefreshToken.for_user(bob).access_token)
+
+    async def ws_flow():
+        comm_bob = WebsocketCommunicator(application, f"/ws/social/?token={tok_b}")
+        assert (await comm_bob.connect())[0] is True
+        comm_alice = WebsocketCommunicator(application, f"/ws/social/?token={tok_a}")
+        assert (await comm_alice.connect())[0] is True
+
+        await comm_alice.send_json_to(
+            {"action": "friend_remove", "op_id": 1, "username": bob.username}
+        )
+
+        got_a = await comm_alice.receive_json_from(timeout=5)
+        got_b = await comm_bob.receive_json_from(timeout=5)
+        assert got_a["type"] == "friend_removed"
+        assert got_a["username"] == bob.username
+        assert got_b["type"] == "friend_removed"
+        assert got_b["username"] == alice.username
+
+        ack = await comm_alice.receive_json_from(timeout=5)
+        assert ack["type"] == "social_ack" and ack["ok"] is True
+
+        await comm_alice.disconnect()
+        await comm_bob.disconnect()
+
+    @database_sync_to_async
+    def assert_not_friends():
+        alice.refresh_from_db()
+        bob.refresh_from_db()
+        assert not alice.friends.filter(pk=bob.pk).exists()
+        assert not bob.friends.filter(pk=alice.pk).exists()
+
+    async_to_sync(ws_flow)()
+    async_to_sync(assert_not_friends)()

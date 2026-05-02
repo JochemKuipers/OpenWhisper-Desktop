@@ -83,3 +83,25 @@ def friend_request_cancel(actor: User, username: str) -> Tuple[bool, Optional[st
     if not deleted:
         return False, "No pending friend request with this user.", []
     return True, None, events
+
+
+def friend_remove(actor: User, username: str) -> Tuple[bool, Optional[str], List[SocialEvent]]:
+    """End mutual friendship (symmetrical M2M) and notify both users."""
+    username = (username or "").strip()
+    if not username:
+        return False, "username is required.", []
+    if username.lower() == actor.username.lower():
+        return False, "You cannot remove yourself.", []
+    other = User.objects.filter(username__iexact=username).first()
+    if other is None:
+        return False, "User not found.", []
+    if not actor.friends.filter(pk=other.pk).exists():
+        return False, "Not friends with this user.", []
+    actor.friends.remove(other)
+    FriendRequest.objects.filter(from_user=actor, to_user=other).delete()
+    FriendRequest.objects.filter(from_user=other, to_user=actor).delete()
+    events: List[SocialEvent] = [
+        (actor.pk, {"type": "friend_removed", "username": other.username}),
+        (other.pk, {"type": "friend_removed", "username": actor.username}),
+    ]
+    return True, None, events

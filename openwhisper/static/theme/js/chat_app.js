@@ -420,6 +420,11 @@
     } else if (t === "friend_request_removed") {
       incomingFromUsernames.delete(j.username);
       outgoingToUsernames.delete(j.username);
+    } else if (t === "friend_removed") {
+      friendsUsernames.delete(j.username);
+      incomingFromUsernames.delete(j.username);
+      outgoingToUsernames.delete(j.username);
+      loadChats().catch(function () {});
     } else {
       return;
     }
@@ -878,16 +883,11 @@
     });
   }
 
-  async function removeFriend(username) {
+  function removeFriend(username) {
     if (!confirm("Remove " + username + " from friends?")) return;
-    await apiFetch(
-      "/api/users/me/friends/" + encodeURIComponent(username) + "/",
-      { method: "DELETE" },
-    );
-    await loadFriendsUsernames();
-    await loadFriendRequests();
-    refreshPeoplePanels();
-    refreshPeopleSearchDomOnly();
+    socialRpc("friend_remove", { username: username }).catch(function (err) {
+      alert(err.message || "Could not remove friend.");
+    });
   }
 
   function sendFriendRequest(username) {

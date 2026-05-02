@@ -20,6 +20,7 @@ from openwhisper.apps.api.serializers import (
     UserSerializer,
 )
 from openwhisper.apps.chat.friend_social import (
+    friend_remove,
     friend_request_accept,
     friend_request_cancel,
     friend_request_send,
@@ -171,8 +172,15 @@ class MeFriendDetailAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def delete(self, request, username):
-        other = get_object_or_404(User, username__iexact=username)
-        request.user.friends.remove(other)
+        ok, err, events = friend_remove(request.user, username)
+        if not ok:
+            st = (
+                status.HTTP_404_NOT_FOUND
+                if err in ("User not found.", "Not friends with this user.")
+                else status.HTTP_400_BAD_REQUEST
+            )
+            return Response({"detail": err}, status=st)
+        dispatch_social_events(events)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
