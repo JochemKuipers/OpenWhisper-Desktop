@@ -52,6 +52,8 @@
     incomingRequestsEmpty: document.getElementById("incoming-requests-empty"),
     outgoingRequestsList: document.getElementById("outgoing-requests-list"),
     outgoingRequestsEmpty: document.getElementById("outgoing-requests-empty"),
+    btnAttach: document.getElementById("btn-attach"),
+    attachmentInput: document.getElementById("composer-attachment-input"),
   };
 
   let chatsCache = [];
@@ -157,6 +159,26 @@
       month: "short",
       day: "numeric",
     });
+  }
+
+  function resolveMediaUrl(url) {
+    if (!url) return "";
+    if (/^https?:\/\//i.test(url)) return url;
+    return window.location.origin + (url.startsWith("/") ? url : "/" + url);
+  }
+
+  function isProbablyImageUrl(url) {
+    return /\.(gif|jpe?g|png|webp|bmp)(\?|$)/i.test(url || "");
+  }
+
+  function attachmentFilenameFromUrl(url) {
+    try {
+      const path = String(url).replace(/^.*\/\/[^/]+/, "");
+      const seg = path.split("/").pop() || "";
+      return decodeURIComponent(seg.split("?")[0] || "") || "Attachment";
+    } catch (_) {
+      return "Attachment";
+    }
   }
 
   function insertAtCursor(textarea, text) {
@@ -704,6 +726,7 @@
           j.content,
           j.created_at,
           true,
+          j.attachment_url || null,
         );
       } catch (_) {
         /* ignore ping etc */
@@ -711,7 +734,7 @@
     };
   }
 
-  function appendBubble(senderLabel, content, createdAt, incoming) {
+  function appendBubble(senderLabel, content, createdAt, incoming, attachmentUrl) {
     const wrap = document.createElement("div");
     wrap.className = incoming
       ? "mb-4 flex justify-start gap-2"
@@ -730,12 +753,43 @@
       (incoming ? senderLabel + " · " : "") + formatShortTime(createdAt);
 
     bubble.appendChild(meta);
-    const p = document.createElement("p");
-    p.className = incoming
-      ? "mt-1 whitespace-pre-wrap text-slate-800"
-      : "mt-1 whitespace-pre-wrap text-white";
-    p.textContent = content;
-    bubble.appendChild(p);
+
+    if (content) {
+      const p = document.createElement("p");
+      p.className = incoming
+        ? "mt-1 whitespace-pre-wrap text-slate-800"
+        : "mt-1 whitespace-pre-wrap text-white";
+      p.textContent = content;
+      bubble.appendChild(p);
+    }
+
+    if (attachmentUrl) {
+      const abs = resolveMediaUrl(attachmentUrl);
+      if (isProbablyImageUrl(abs)) {
+        const img = document.createElement("img");
+        img.src = abs;
+        img.alt = "";
+        img.loading = "lazy";
+        img.className =
+          (content ? "mt-2" : "mt-1") +
+          " max-h-64 max-w-full rounded-lg object-contain " +
+          (incoming ? "ring-1 ring-slate-200" : "ring-1 ring-blue-400/40");
+        bubble.appendChild(img);
+      } else {
+        const a = document.createElement("a");
+        a.href = abs;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.className =
+          (content ? "mt-2" : "mt-1") +
+          " block truncate text-sm font-medium " +
+          (incoming
+            ? "text-blue-700 underline hover:text-blue-800"
+            : "text-white underline hover:text-blue-100");
+        a.textContent = attachmentFilenameFromUrl(abs);
+        bubble.appendChild(a);
+      }
+    }
 
     if (incoming) {
       const av = document.createElement("div");
@@ -760,7 +814,13 @@
     chronological.forEach(function (m) {
       const uname = m.sender && m.sender.username ? m.sender.username : "?";
       const incoming = uname !== currentUsername;
-      appendBubble(uname, m.content || "", m.created_at, incoming);
+      appendBubble(
+        uname,
+        m.content || "",
+        m.created_at,
+        incoming,
+        m.attachment_url || null,
+      );
     });
     els.thread.scrollTop = els.thread.scrollHeight;
   }
@@ -775,6 +835,7 @@
 
     els.chatEmpty.classList.add("hidden");
     els.chatActive.classList.remove("hidden");
+    els.chatActive.classList.add("flex", "flex-col");
 
     syncChatHeader(chat);
 
@@ -808,6 +869,48 @@
     });
     renderMessages(pk, msgs);
     await loadChats();
+  }
+
+  async function uploadChatAttachments(fileList) {
+    const pk = selectedChatPk;
+    if (!pk || !fileList || !fileList.length) return;
+    const caption = (els.composer.value || "").trim();
+    const files = Array.prototype.slice.call(fileList);
+    for (let i = 0; i < files.length; i++) {
+      const fd = new FormData();
+      if (caption && i === 0) fd.append("content", caption);
+      fd.append("attachment", files[i], files[i].name);
+      await apiFetch("/api/chats/" + pk + "/messages/", {
+        method: "POST",
+        body: fd,
+      });
+    }
+    els.composer.value = "";
+    const msgs = await apiFetch("/api/chats/" + pk + "/messages/", {
+      method: "GET",
+    });
+    renderMessages(pk, msgs);
+    await loadChats();
+  }
+
+  function initAttachmentPicker() {
+    const btn = els.btnAttach;
+    const inp = els.attachmentInput;
+    if (!btn || !inp) return;
+
+    btn.addEventListener("click", function () {
+      if (!selectedChatPk) return;
+      inp.click();
+    });
+
+    inp.addEventListener("change", function () {
+      const files = inp.files;
+      if (!files || !files.length) return;
+      uploadChatAttachments(files).catch(function (err) {
+        alert(err.message || "Could not upload attachment.");
+      });
+      inp.value = "";
+    });
   }
 
   els.convSearch.addEventListener("input", function () {
@@ -1367,6 +1470,7 @@
   }
 
   initEmojiPicker();
+  initAttachmentPicker();
 
   if (els.btnInviteChat)
     els.btnInviteChat.addEventListener("click", function () {

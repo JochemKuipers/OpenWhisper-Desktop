@@ -9,15 +9,14 @@ from openwhisper.apps.chat.realtime import broadcast_chat_message
 def notify_ws_on_message(sender, instance: Message, created: bool, **kwargs):
     if not created:
         return
-    broadcast_chat_message(
-        chat_id=instance.chat_id,
-        payload={
-            "type": "message.created",
-            "message_id": instance.pk,
-            "chat_id": instance.chat_id,
-            "sender_id": instance.sender_id,
-            "sender_username": instance.sender.username,
-            "content": instance.content,
-            "created_at": instance.created_at.isoformat(),
-        },
-    )
+    payload = {
+        "type": "message.created",
+        "message_id": instance.pk,
+        "chat_id": instance.chat_id,
+        "sender_id": instance.sender_id,
+        "sender_username": instance.sender.username,
+        "content": instance.content,
+        "created_at": instance.created_at.isoformat(),
+        "attachment_url": instance.attachment.url if instance.attachment else None,
+    }
+    broadcast_chat_message(chat_id=instance.chat_id, payload=payload)

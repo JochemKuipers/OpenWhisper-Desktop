@@ -86,10 +86,20 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class MessageSerializer(serializers.HyperlinkedModelSerializer):
     sender = UserSerializer(read_only=True)
+    attachment_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
-        fields = ["url", "sender", "content", "created_at", "updated_at"]
+        fields = ["url", "sender", "content", "attachment_url", "created_at", "updated_at"]
+
+    def get_attachment_url(self, obj):
+        if not obj.attachment:
+            return None
+        url = obj.attachment.url
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(url)
+        return url
 
 
 class ChatSerializer(serializers.HyperlinkedModelSerializer):

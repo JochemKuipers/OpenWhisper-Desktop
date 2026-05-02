@@ -400,8 +400,12 @@ class ChatViewSet(viewsets.ModelViewSet):
         return Response(ChatSerializer(refreshed, context={"request": request}).data)
 
 
+MAX_CHAT_ATTACHMENT_BYTES = 10 * 1024 * 1024
+
+
 class ChatMessagesAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_object(self, chat_id):
         try:
@@ -424,13 +428,28 @@ class ChatMessagesAPIView(APIView):
                 {"detail": "You are not a member of this chat."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        content = request.data.get("content")
-        if content is None or (isinstance(content, str) and not content.strip()):
+        raw_content = request.data.get("content", "")
+        content = raw_content.strip() if isinstance(raw_content, str) else ""
+        attachment = request.FILES.get("attachment")
+
+        if attachment and attachment.size > MAX_CHAT_ATTACHMENT_BYTES:
             return Response(
-                {"detail": "Message content is required."},
+                {"detail": "Attachment too large (max 10 MB)."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        message = Message.objects.create(chat=chat, sender=request.user, content=content)
+
+        if not content and not attachment:
+            return Response(
+                {"detail": "Message content or a file attachment is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        message = Message.objects.create(
+            chat=chat,
+            sender=request.user,
+            content=content,
+            attachment=attachment if attachment else None,
+        )
         serializer = MessageSerializer(message, context={"request": request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

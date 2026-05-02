@@ -41,7 +41,12 @@ class Message(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
     )
-    content = models.TextField()
+    content = models.TextField(blank=True, default="")
+    attachment = models.FileField(
+        upload_to="chat_attachments/",
+        null=True,
+        blank=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
