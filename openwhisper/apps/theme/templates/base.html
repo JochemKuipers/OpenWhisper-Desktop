@@ -1,17 +1,25 @@
 {% load static tailwind_tags %}
 <!DOCTYPE html>
-<html lang="en" class="{% block html_class %}{% endblock %}">
+<html lang="en" class="{% block html_class %}{% endblock html_class %}">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <meta name="description"
+              content="{% block meta_description %}{% endblock meta_description %}">
+        <meta name="keywords"
+              content="{% block meta_keywords %}{% endblock meta_keywords %}">
         <title>
-            {% block title %}OpenWhisper{% endblock %}
+            {% block title %}
+                OpenWhisper
+            {% endblock title %}
         </title>
         {% tailwind_css %}
-        {% block extra_head %}{% endblock %}
+        {% block extra_head %}
+        {% endblock extra_head %}
     </head>
-    <body class="{% block body_class %}min-h-screen bg-slate-50 text-slate-900 antialiased{% endblock %}">
-        {% block body %}{% endblock %}
+    <body class="{% block body_class %} min-h-screen bg-slate-50 text-slate-900 antialiased {% endblock body_class %}">
+        {% block body %}
+        {% endblock body %}
     </body>
 </html>

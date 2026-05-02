@@ -5,23 +5,23 @@
           content="{% block meta_description %}OpenWhisper is a privacy-minded messaging stack: Django API, real-time Channels, and modern web UI.{% endblock %}">
     <link rel="canonical" href="{{ request.build_absolute_uri }}">
     <meta name="robots"
-          content="{% block meta_robots %}index,follow{% endblock %}">
+          content="{% block meta_robots %}index,follow{% endblock meta_robots %}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.build_absolute_uri }}">
     <meta property="og:title"
-          content="{% block og_title %}OpenWhisper{% endblock %}">
+          content="{% block og_title %}OpenWhisper{% endblock og_title %}">
     <meta property="og:description"
-          content="{% block og_description %}Privacy-focused messaging built with Django, WebSockets, and Tailwind CSS.{% endblock %}">
+          content="{% block og_description %}Privacy-focused messaging built with Django, WebSockets, and Tailwind CSS.{% endblock og_description %}">
     <meta property="og:site_name" content="OpenWhisper">
     {% block og_image %}
         <meta property="og:image"
               content="{{ request.scheme }}://{{ request.get_host }}{% static 'theme/img/openwhisper-og.svg' %}">
-    {% endblock %}
+    {% endblock og_image %}
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title"
-          content="{% block twitter_title %}OpenWhisper{% endblock %}">
+          content="{% block twitter_title %}OpenWhisper{% endblock twitter_title %}">
     <meta name="twitter:description"
-          content="{% block twitter_description %}Privacy-focused messaging built with Django and real-time WebSockets.{% endblock %}">
+          content="{% block twitter_description %}Privacy-focused messaging built with Django and real-time WebSockets.{% endblock twitter_description %}">
     {% block json_ld %}
         <script type="application/ld+json">
             {
@@ -40,7 +40,7 @@
                 ]
             }
         </script>
-    {% endblock %}
+    {% endblock json_ld %}
 {% endblock %}
 {% block body %}
     <div class="flex min-h-screen flex-col">
@@ -67,10 +67,11 @@
             </div>
         </header>
         <main class="flex-1">
-            {% block content %}{% endblock %}
+            {% block content %}
+            {% endblock content %}
         </main>
         <footer class="border-t border-slate-200 bg-white py-8 text-center text-sm text-slate-500">
-            <p>&copy; {% now "Y" %} OpenWhisper. Built for privacy-aware messaging.</p>
+            <p>© {% now "Y" %} OpenWhisper. Built for privacy-aware messaging.</p>
         </footer>
     </div>
-{% endblock %}
+{% endblock body %}
