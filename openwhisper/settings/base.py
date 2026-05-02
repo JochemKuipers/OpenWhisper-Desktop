@@ -29,14 +29,15 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
+    "channels",
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
-    "daphne",
     "tailwind",
     "openwhisper.apps.theme",
     "openwhisper.apps.user",
-    "openwhisper.apps.chat",
+    "openwhisper.apps.chat.apps.ChatConfig",
     "openwhisper.apps.api",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -82,6 +83,8 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "openwhisper.wsgi.application"
+
+ASGI_APPLICATION = "openwhisper.asgi.application"
 
 
 # Database

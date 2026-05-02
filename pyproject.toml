@@ -32,6 +32,14 @@ dev = [
     "ruff>=0.15.12",
 ]
 
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "openwhisper.settings.tests"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+
 [tool.mypy]
 python_version = "3.13"
+plugins = ["mypy_django_plugin.main"]
 disable_error_code = ["import-untyped"]
+
+[tool.django-stubs]
+django_settings_module = "openwhisper.settings.local"

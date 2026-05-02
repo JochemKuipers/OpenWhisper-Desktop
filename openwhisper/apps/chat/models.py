@@ -3,12 +3,12 @@ from django.db import models
 
 
 class Chat(models.Model):
-    users: models.ManyToManyField = models.ManyToManyField(
+    users = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         blank=True,
     )
-    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Chat between {self.users.all()}"
@@ -24,18 +24,18 @@ class Chat(models.Model):
         app_label = "chat"
 
 class Message(models.Model):
-    chat: models.ForeignKey = models.ForeignKey(
+    chat = models.ForeignKey(
         "chat.Chat",
         on_delete=models.CASCADE,
         related_name="messages",
     )
-    sender: models.ForeignKey = models.ForeignKey(
+    sender = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
     )
-    content: models.TextField = models.TextField()
-    created_at: models.DateTimeField = models.DateTimeField(auto_now_add=True)
-    updated_at: models.DateTimeField = models.DateTimeField(auto_now=True)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Message from {self.sender.username} to {self.chat.users.all()}"
@@ -46,7 +46,7 @@ class Message(models.Model):
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["created_at"]),
+            models.Index(fields=["chat", "created_at"]),
         ]
-        unique_together = ["chat", "sender"]
         db_table = "messages"
         app_label = "chat"

@@ -42,29 +42,25 @@ class UserChatsAPIView(APIView):
     Get all chats for a user
     """
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def get_object(self, user_id):
         try:
             return User.objects.get(id=user_id)
         except User.DoesNotExist:
-            return Http404
-    
+            raise Http404()
+
     def get(self, request, user_id):
         user = self.get_object(user_id)
         chats = Chat.objects.filter(users=user)
-        serializer = ChatSerializer(chats, many=True)
-        if serializer.is_valid():
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+        serializer = ChatSerializer(chats, many=True, context={"request": request})
+        return Response(serializer.data)
+
     def post(self, request, user_id):
         user = self.get_object(user_id)
-        chat = Chat.objects.create(users=[user])
-        serializer = ChatSerializer(chat)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        chat = Chat.objects.create()
+        chat.users.add(user)
+        serializer = ChatSerializer(chat, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def delete(self, request, user_id):
         try:
@@ -83,29 +79,35 @@ class ChatMessagesAPIView(APIView):
     Get all messages for a chat
     """
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def get_object(self, chat_id):
         try:
             return Chat.objects.get(id=chat_id)
         except Chat.DoesNotExist:
-            return Http404
-        
+            raise Http404()
+
     def get(self, request, chat_id):
         chat = self.get_object(chat_id)
         messages = chat.messages.all()
-        serializer = MessageSerializer(messages, many=True)
-        if serializer.is_valid():
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+        serializer = MessageSerializer(messages, many=True, context={"request": request})
+        return Response(serializer.data)
+
     def post(self, request, chat_id):
         chat = self.get_object(chat_id)
-        message = Message.objects.create(chat=chat, sender=request.user, content=request.data.get('content'))
-        serializer = MessageSerializer(message)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if not chat.users.filter(pk=request.user.pk).exists():
+            return Response(
+                {"detail": "You are not a member of this chat."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        content = request.data.get("content")
+        if content is None or (isinstance(content, str) and not content.strip()):
+            return Response(
+                {"detail": "Message content is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        message = Message.objects.create(chat=chat, sender=request.user, content=content)
+        serializer = MessageSerializer(message, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     def delete(self, request, chat_id):
         try:
