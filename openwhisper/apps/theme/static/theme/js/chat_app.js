@@ -23,6 +23,18 @@
     headerTitle: document.getElementById("chat-header-title"),
     headerSub: document.getElementById("chat-header-sub"),
     headerAvatar: document.getElementById("chat-header-avatar"),
+    btnInviteChat: document.getElementById("btn-invite-chat"),
+    btnRenameChat: document.getElementById("btn-rename-chat"),
+    renameChatModal: document.getElementById("rename-chat-modal"),
+    renameChatBackdrop: document.getElementById("rename-chat-modal-backdrop"),
+    renameChatCancel: document.getElementById("rename-chat-cancel"),
+    renameChatSave: document.getElementById("rename-chat-save"),
+    renameChatInput: document.getElementById("rename-chat-input"),
+    inviteModal: document.getElementById("invite-modal"),
+    inviteModalBackdrop: document.getElementById("invite-modal-backdrop"),
+    inviteModalClose: document.getElementById("invite-modal-close"),
+    inviteFriendsList: document.getElementById("invite-friends-list"),
+    inviteFriendsEmpty: document.getElementById("invite-friends-empty"),
     btnOpenPeople: document.getElementById("btn-open-people"),
     peopleModal: document.getElementById("people-modal"),
     peopleModalBackdrop: document.getElementById("people-modal-backdrop"),
@@ -315,6 +327,31 @@
     return names.length ? names.join(", ") : "Chat";
   }
 
+  function displayChatTitle(chat) {
+    const raw =
+      chat && chat.title != null && chat.title !== undefined
+        ? String(chat.title).trim()
+        : "";
+    if (raw) return raw;
+    return participantTitle(chat);
+  }
+
+  function isMultiUserChat(chat) {
+    return (chat.users || []).length >= 3;
+  }
+
+  function syncChatHeader(chat) {
+    if (!chat || !els.headerTitle) return;
+    const title = displayChatTitle(chat);
+    els.headerTitle.textContent = title;
+    els.headerSub.textContent =
+      (chat.users || []).length + " members · Active";
+    els.headerAvatar.textContent = title.slice(0, 2).toUpperCase();
+    if (els.btnRenameChat) {
+      els.btnRenameChat.classList.toggle("hidden", !isMultiUserChat(chat));
+    }
+  }
+
   function lastPreview(chat) {
     const msgs = chat.messages || [];
     if (!msgs.length) return "No messages yet";
@@ -330,7 +367,8 @@
     els.convList.innerHTML = "";
     const list = chatsCache.filter(function (c) {
       if (!ft) return true;
-      const hay = (participantTitle(c) + " " + lastPreview(c)).toLowerCase();
+      const hay =
+        (displayChatTitle(c) + " " + participantTitle(c) + " " + lastPreview(c)).toLowerCase();
       return hay.indexOf(ft) !== -1;
     });
     if (!list.length) {
@@ -347,7 +385,7 @@
       li.className =
         "cursor-pointer rounded-xl px-3 py-3 hover:bg-slate-50 " +
         (pk === selectedChatPk ? "bg-blue-50 ring-1 ring-blue-200" : "");
-      const title = participantTitle(chat);
+      const title = displayChatTitle(chat);
       const preview = lastPreview(chat);
       const lastMsg =
         chat.messages && chat.messages.length
@@ -425,6 +463,18 @@
       incomingFromUsernames.delete(j.username);
       outgoingToUsernames.delete(j.username);
       loadChats().catch(function () {});
+    } else if (t === "chat_updated") {
+      loadChats()
+        .then(function () {
+          if (!selectedChatPk) return;
+          if (String(selectedChatPk) !== String(j.chat_id)) return;
+          const ch = chatsCache.find(function (c) {
+            return chatPkFromUrl(c.url) === String(j.chat_id);
+          });
+          if (ch) syncChatHeader(ch);
+        })
+        .catch(function () {});
+      return;
     } else {
       return;
     }
@@ -553,6 +603,20 @@
       try {
         const j = JSON.parse(ev.data);
         if (
+          j.type === "chat.members_updated" &&
+          String(j.chat_id) === String(chatPk)
+        ) {
+          loadChats()
+            .then(function () {
+              const ch = chatsCache.find(function (c) {
+                return chatPkFromUrl(c.url) === String(chatPk);
+              });
+              if (ch) syncChatHeader(ch);
+            })
+            .catch(function () {});
+          return;
+        }
+        if (
           j.type !== "message.created" ||
           String(j.chat_id) !== String(chatPk)
         )
@@ -635,10 +699,7 @@
     els.chatEmpty.classList.add("hidden");
     els.chatActive.classList.remove("hidden");
 
-    const title = participantTitle(chat);
-    els.headerTitle.textContent = title;
-    els.headerSub.textContent = (chat.users || []).length + " members · Active";
-    els.headerAvatar.textContent = title.slice(0, 2).toUpperCase();
+    syncChatHeader(chat);
 
     const msgs = await apiFetch("/api/chats/" + pk + "/messages/", {
       method: "GET",
@@ -1063,7 +1124,151 @@
     renderPeopleSearchRows(cachedPeopleSearchRows);
   }
 
+  function closeInviteModal() {
+    if (els.inviteModal) els.inviteModal.classList.add("hidden");
+    document.body.classList.remove("overflow-hidden");
+  }
+
+  function closeRenameChatModal() {
+    if (els.renameChatModal) els.renameChatModal.classList.add("hidden");
+    document.body.classList.remove("overflow-hidden");
+  }
+
+  function openRenameChatModal() {
+    if (!els.renameChatModal || !selectedChatPk || !els.renameChatInput) return;
+    const chat = chatsCache.find(function (c) {
+      return chatPkFromUrl(c.url) === String(selectedChatPk);
+    });
+    if (!chat || !isMultiUserChat(chat)) return;
+    const stored =
+      chat.title != null && chat.title !== undefined ? String(chat.title).trim() : "";
+    els.renameChatInput.value = stored;
+    els.renameChatModal.classList.remove("hidden");
+    document.body.classList.add("overflow-hidden");
+    els.renameChatInput.focus();
+    els.renameChatInput.select();
+  }
+
+  async function saveRenameChatTitle() {
+    const pk = selectedChatPk;
+    if (!pk || !els.renameChatInput) return;
+    const raw = els.renameChatInput.value.trim();
+    try {
+      await apiFetch("/api/chats/" + encodeURIComponent(pk) + "/", {
+        method: "PATCH",
+        body: { title: raw },
+      });
+      closeRenameChatModal();
+      await loadChats();
+      const ch = chatsCache.find(function (c) {
+        return chatPkFromUrl(c.url) === String(pk);
+      });
+      if (ch) syncChatHeader(ch);
+    } catch (e) {
+      alert(e.message || "Could not save chat name.");
+    }
+  }
+
+  async function openInviteModal() {
+    if (!els.inviteModal || !selectedChatPk || !els.inviteFriendsList) return;
+    const chat = chatsCache.find(function (c) {
+      return chatPkFromUrl(c.url) === String(selectedChatPk);
+    });
+    if (!chat) return;
+    els.inviteModal.classList.remove("hidden");
+    document.body.classList.add("overflow-hidden");
+    els.inviteFriendsList.innerHTML = "";
+    if (els.inviteFriendsEmpty) els.inviteFriendsEmpty.classList.add("hidden");
+
+    let rows;
+    try {
+      rows = await apiFetch("/api/users/me/friends/", { method: "GET" });
+    } catch (e) {
+      alert(e.message || "Could not load friends.");
+      closeInviteModal();
+      return;
+    }
+
+    const inChat = new Set(
+      (chat.users || []).map(function (u) {
+        return u.username;
+      }),
+    );
+    const eligible = (rows || []).filter(function (r) {
+      return !inChat.has(r.username);
+    });
+
+    if (!eligible.length) {
+      if (els.inviteFriendsEmpty)
+        els.inviteFriendsEmpty.classList.remove("hidden");
+      return;
+    }
+    if (els.inviteFriendsEmpty) els.inviteFriendsEmpty.classList.add("hidden");
+
+    eligible.forEach(function (row) {
+      const uname = row.username;
+      const li = document.createElement("li");
+      li.className =
+        "flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2";
+      const span = document.createElement("span");
+      span.className = "truncate text-sm font-medium text-slate-800";
+      span.textContent = uname;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className =
+        "shrink-0 rounded-lg bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-500";
+      btn.textContent = "Invite";
+      btn.addEventListener("click", function () {
+        inviteFriendToChat(uname).catch(function (err) {
+          alert(err.message || "Could not invite.");
+        });
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      els.inviteFriendsList.appendChild(li);
+    });
+  }
+
+  async function inviteFriendToChat(username) {
+    const pk = selectedChatPk;
+    if (!pk) return;
+    await apiFetch(
+      "/api/chats/" + encodeURIComponent(pk) + "/invite/",
+      {
+        method: "POST",
+        body: { username: username },
+      },
+    );
+    closeInviteModal();
+    await loadChats();
+    const ch = chatsCache.find(function (c) {
+      return chatPkFromUrl(c.url) === String(pk);
+    });
+    if (ch) syncChatHeader(ch);
+  }
+
   initEmojiPicker();
+
+  if (els.btnInviteChat)
+    els.btnInviteChat.addEventListener("click", function () {
+      openInviteModal().catch(function () {});
+    });
+  if (els.btnRenameChat)
+    els.btnRenameChat.addEventListener("click", function () {
+      openRenameChatModal();
+    });
+  if (els.renameChatBackdrop)
+    els.renameChatBackdrop.addEventListener("click", closeRenameChatModal);
+  if (els.renameChatCancel)
+    els.renameChatCancel.addEventListener("click", closeRenameChatModal);
+  if (els.renameChatSave)
+    els.renameChatSave.addEventListener("click", function () {
+      saveRenameChatTitle().catch(function () {});
+    });
+  if (els.inviteModalClose)
+    els.inviteModalClose.addEventListener("click", closeInviteModal);
+  if (els.inviteModalBackdrop)
+    els.inviteModalBackdrop.addEventListener("click", closeInviteModal);
 
   if (els.btnOpenPeople)
     els.btnOpenPeople.addEventListener("click", openPeopleModal);

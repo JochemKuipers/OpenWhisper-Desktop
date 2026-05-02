@@ -12,6 +12,10 @@
                 <span class="text-sm text-slate-600">Messages</span>
             </div>
             <nav class="flex items-center gap-3 text-sm">
+                {% if request.user.is_authenticated %}
+                <span class="hidden text-slate-500 sm:inline" aria-hidden="true">·</span>
+                <span class="max-w-[10rem] truncate font-medium text-slate-800" title="{{ request.user.username }}">{{ request.user.username }}</span>
+                {% endif %}
                 <a href="{% url 'account-settings' %}" class="text-slate-600 hover:text-slate-900">Settings</a>
                 <form method="post" action="{% url 'logout' %}">
                     {% csrf_token %}

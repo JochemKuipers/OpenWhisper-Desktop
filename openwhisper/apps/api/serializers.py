@@ -94,7 +94,14 @@ class MessageSerializer(serializers.HyperlinkedModelSerializer):
 class ChatSerializer(serializers.HyperlinkedModelSerializer):
     users = UserSerializer(many=True, read_only=True)
     messages = MessageSerializer(many=True, read_only=True)
+    title = serializers.CharField(required=False, allow_blank=True, max_length=120)
 
     class Meta:
         model = Chat
-        fields = ["url", "users", "messages", "created_at", "updated_at"]
+        fields = ["url", "title", "users", "messages", "created_at", "updated_at"]
+        read_only_fields = ["url", "users", "messages", "created_at", "updated_at"]
+
+    def validate_title(self, value):
+        if value is None:
+            return ""
+        return value.strip()

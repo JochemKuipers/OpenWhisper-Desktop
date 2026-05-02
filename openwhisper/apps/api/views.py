@@ -26,10 +26,20 @@ from openwhisper.apps.chat.friend_social import (
     friend_request_send,
 )
 from openwhisper.apps.chat.models import Chat, Message
-from openwhisper.apps.chat.realtime import dispatch_social_events
+from openwhisper.apps.chat.realtime import broadcast_chat_message, dispatch_social_events
 from openwhisper.apps.user.models import FriendRequest
 
 User = get_user_model()
+
+
+def _chat_detail_prefetched(pk: int) -> Chat:
+    return Chat.objects.prefetch_related(
+        "users",
+        Prefetch(
+            "messages",
+            queryset=Message.objects.select_related("sender").order_by("created_at"),
+        ),
+    ).get(pk=pk)
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -220,18 +230,53 @@ class StartDmChatAPIView(APIView):
 
         chat = Chat.objects.create()
         chat.users.add(request.user, other)
-        chat.refresh_from_db()
-        chat = (
-            Chat.objects.prefetch_related(
-                "users",
-                Prefetch(
-                    "messages",
-                    queryset=Message.objects.select_related("sender").order_by("created_at"),
-                ),
-            )
-            .get(pk=chat.pk)
-        )
+        chat = _chat_detail_prefetched(chat.pk)
         return Response(ChatSerializer(chat, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+
+class ChatInviteAPIView(APIView):
+    """Add an accepted friend to an existing chat (group); notifies members via WebSockets."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, chat_id):
+        username = (request.data.get("username") or "").strip()
+        if not username:
+            return Response({"detail": "username is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        chat = Chat.objects.filter(pk=chat_id).first()
+        if chat is None:
+            raise Http404()
+        if not chat.users.filter(pk=request.user.pk).exists():
+            return Response({"detail": "You are not a member of this chat."}, status=status.HTTP_403_FORBIDDEN)
+
+        invitee = User.objects.filter(username__iexact=username).first()
+        if invitee is None:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+        if invitee.pk == request.user.pk:
+            return Response({"detail": "Cannot invite yourself."}, status=status.HTTP_400_BAD_REQUEST)
+        if chat.users.filter(pk=invitee.pk).exists():
+            return Response({"detail": "User is already in this chat."}, status=status.HTTP_400_BAD_REQUEST)
+        if not request.user.friends.filter(pk=invitee.pk).exists():
+            return Response({"detail": "You can only invite friends."}, status=status.HTTP_403_FORBIDDEN)
+
+        chat.users.add(invitee)
+        chat.save(update_fields=["updated_at"])
+
+        refreshed = _chat_detail_prefetched(chat.pk)
+        member_ids = list(refreshed.users.values_list("pk", flat=True))
+        dispatch_social_events(
+            [(uid, {"type": "chat_updated", "chat_id": refreshed.pk}) for uid in member_ids]
+        )
+        broadcast_chat_message(
+            chat_id=refreshed.pk,
+            payload={
+                "type": "chat.members_updated",
+                "chat_id": refreshed.pk,
+            },
+        )
+
+        return Response(ChatSerializer(refreshed, context={"request": request}).data)
 
 
 class MessageViewSet(viewsets.ModelViewSet):
@@ -255,6 +300,39 @@ class ChatViewSet(viewsets.ModelViewSet):
             ),
         ).order_by("-updated_at")
         return qs.filter(users=self.request.user).distinct()
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        if instance.users.count() < 3:
+            return Response(
+                {
+                    "detail": "Custom titles are only available for chats with 3 or more participants.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        if not serializer.validated_data:
+            refreshed = _chat_detail_prefetched(instance.pk)
+            return Response(ChatSerializer(refreshed, context={"request": request}).data)
+
+        self.perform_update(serializer)
+
+        refreshed = _chat_detail_prefetched(instance.pk)
+        member_ids = list(refreshed.users.values_list("pk", flat=True))
+        dispatch_social_events(
+            [(uid, {"type": "chat_updated", "chat_id": refreshed.pk}) for uid in member_ids]
+        )
+        broadcast_chat_message(
+            chat_id=refreshed.pk,
+            payload={
+                "type": "chat.members_updated",
+                "chat_id": refreshed.pk,
+            },
+        )
+
+        return Response(ChatSerializer(refreshed, context={"request": request}).data)
 
 
 class ChatMessagesAPIView(APIView):

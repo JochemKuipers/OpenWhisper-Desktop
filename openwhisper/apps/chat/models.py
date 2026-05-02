@@ -7,6 +7,7 @@ class Chat(models.Model):
         settings.AUTH_USER_MODEL,
         blank=True,
     )
+    title = models.CharField(max_length=120, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
