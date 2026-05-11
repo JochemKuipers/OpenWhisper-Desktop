@@ -41,6 +41,22 @@ class ThemeLogoutView(View):
 class AccountSettingsView(LoginRequiredMixin, TemplateView):
     template_name = "account/settings.html"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        context["profile_initial"] = {
+            "username": user.username or "",
+            "email": user.email or "",
+            "first_name": user.first_name or "",
+            "last_name": user.last_name or "",
+            "bio": user.bio or "",
+            "phone_number": user.phone_number or "",
+            "location": user.location or "",
+            "gender": user.gender or "",
+            "birth_date": user.birth_date.isoformat() if user.birth_date else "",
+        }
+        return context
+
 
 class ChatAppView(LoginRequiredMixin, TemplateView):
     template_name = "app/chat.html"

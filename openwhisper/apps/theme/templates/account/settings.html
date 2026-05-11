@@ -20,6 +20,7 @@
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Username</label>
                 <input type="text"
                        id="pf-username"
+                       value="{{ profile_initial.username }}"
                        readonly
                        class="mt-1 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
             </div>
@@ -29,6 +30,7 @@
                 <input type="email"
                        id="pf-email"
                        name="email"
+                       value="{{ profile_initial.email }}"
                        class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
             </div>
             <div class="grid gap-4 sm:grid-cols-2">
@@ -40,6 +42,7 @@
                     <input type="text"
                            id="pf-first"
                            name="first_name"
+                           value="{{ profile_initial.first_name }}"
                            class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 </div>
                 <div>
@@ -48,6 +51,7 @@
                     <input type="text"
                            id="pf-last"
                            name="last_name"
+                           value="{{ profile_initial.last_name }}"
                            class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                 </div>
             </div>
@@ -57,7 +61,7 @@
                 <textarea id="pf-bio"
                           name="bio"
                           rows="3"
-                          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"></textarea>
+                          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">{{ profile_initial.bio }}</textarea>
             </div>
             <div>
                 <label for="pf-phone"
@@ -66,6 +70,7 @@
                        id="pf-phone"
                        name="phone_number"
                        maxlength="10"
+                       value="{{ profile_initial.phone_number }}"
                        class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
             </div>
             <div>
@@ -74,6 +79,7 @@
                 <input type="text"
                        id="pf-location"
                        name="location"
+                       value="{{ profile_initial.location }}"
                        class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
             </div>
             <div>
@@ -83,9 +89,9 @@
                         name="gender"
                         class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                     <option value="">—</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
+                    <option value="male" {% if profile_initial.gender == "male" %}selected{% endif %}>Male</option>
+                    <option value="female" {% if profile_initial.gender == "female" %}selected{% endif %}>Female</option>
+                    <option value="other" {% if profile_initial.gender == "other" %}selected{% endif %}>Other</option>
                 </select>
             </div>
             <div>
@@ -94,6 +100,7 @@
                 <input type="date"
                        id="pf-birth"
                        name="birth_date"
+                       value="{{ profile_initial.birth_date }}"
                        class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
             </div>
             <div>

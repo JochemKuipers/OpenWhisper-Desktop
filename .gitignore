@@ -217,5 +217,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Django collected static assets
+staticfiles/
+openwhisper/static/
+
 
 media/

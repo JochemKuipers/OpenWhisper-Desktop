@@ -1,15 +1,21 @@
-(function () {
-  const STORAGE_ACCESS = "openwhisper_access";
-  const STORAGE_REFRESH = "openwhisper_refresh";
+import {
+  apiFetch,
+  bootstrapSessionJwt,
+  getAccess,
+} from "./chat_app/api.js";
+import { initEmojiPicker } from "./chat_app/emoji.js";
+import {
+  closeDialog,
+  isDialogOpen,
+  openDialog,
+  wireDialogDismiss,
+} from "./chat_app/dialogs.js";
 
-  /** emoji-picker-element — loads from CDN (package has no vendored bundle in repo). */
-  const EMOJI_PICKER_MODULE =
-    "https://cdn.jsdelivr.net/npm/emoji-picker-element@1.29.1/index.js";
-
-  const root = document.getElementById("chat-app-root");
-  if (!root) return;
-
-  const currentUsername = root.dataset.currentUser || "";
+const root = document.getElementById("chat-app-root");
+if (!root) {
+  throw new Error("chat-app-root not found");
+}
+const currentUsername = root.dataset.currentUser || "";
 
   const els = {
     convSearch: document.getElementById("conv-search"),
@@ -27,22 +33,18 @@
     btnChatMembers: document.getElementById("btn-chat-members"),
     btnRenameChat: document.getElementById("btn-rename-chat"),
     renameChatModal: document.getElementById("rename-chat-modal"),
-    renameChatBackdrop: document.getElementById("rename-chat-modal-backdrop"),
     renameChatCancel: document.getElementById("rename-chat-cancel"),
     renameChatSave: document.getElementById("rename-chat-save"),
     renameChatInput: document.getElementById("rename-chat-input"),
     inviteModal: document.getElementById("invite-modal"),
-    inviteModalBackdrop: document.getElementById("invite-modal-backdrop"),
     inviteModalClose: document.getElementById("invite-modal-close"),
     inviteFriendsList: document.getElementById("invite-friends-list"),
     inviteFriendsEmpty: document.getElementById("invite-friends-empty"),
     chatMembersModal: document.getElementById("chat-members-modal"),
-    chatMembersModalBackdrop: document.getElementById("chat-members-modal-backdrop"),
     chatMembersModalClose: document.getElementById("chat-members-modal-close"),
     chatMembersList: document.getElementById("chat-members-list"),
     btnOpenPeople: document.getElementById("btn-open-people"),
     peopleModal: document.getElementById("people-modal"),
-    peopleModalBackdrop: document.getElementById("people-modal-backdrop"),
     peopleModalClose: document.getElementById("people-modal-close"),
     peopleSearch: document.getElementById("people-search"),
     peopleSearchResults: document.getElementById("people-search-results"),
@@ -54,6 +56,8 @@
     outgoingRequestsEmpty: document.getElementById("outgoing-requests-empty"),
     btnAttach: document.getElementById("btn-attach"),
     attachmentInput: document.getElementById("composer-attachment-input"),
+    btnEmoji: document.getElementById("btn-emoji"),
+    emojiHost: document.getElementById("emoji-picker-host"),
   };
 
   let chatsCache = [];
@@ -69,81 +73,9 @@
   let searchDebounceTimer = null;
   /** Bumps on each runPeopleSearch start so overlapping awaits cannot append twice. */
   let peopleSearchSeq = 0;
+  let selectChatSeq = 0;
   let cachedPeopleSearchQuery = "";
   let cachedPeopleSearchRows = null;
-
-  function getCsrf() {
-    const inp = document.querySelector('[name="csrfmiddlewaretoken"]');
-    return inp ? inp.value : "";
-  }
-
-  function setTokens(access, refresh) {
-    sessionStorage.setItem(STORAGE_ACCESS, access);
-    sessionStorage.setItem(STORAGE_REFRESH, refresh);
-  }
-
-  function clearTokens() {
-    sessionStorage.removeItem(STORAGE_ACCESS);
-    sessionStorage.removeItem(STORAGE_REFRESH);
-  }
-
-  function getAccess() {
-    return sessionStorage.getItem(STORAGE_ACCESS);
-  }
-
-  async function apiFetch(path, options) {
-    options = options || {};
-    const headers = new Headers(options.headers || {});
-    const token = getAccess();
-    if (token) headers.set("Authorization", "Bearer " + token);
-    const csrftoken = getCsrf();
-    if (csrftoken) headers.set("X-CSRFToken", csrftoken);
-    let body = options.body;
-    if (
-      body !== undefined &&
-      body !== null &&
-      typeof body === "object" &&
-      !(body instanceof FormData)
-    ) {
-      headers.set("Content-Type", "application/json");
-      body = JSON.stringify(body);
-    }
-    const res = await fetch(path, {
-      method: options.method || "GET",
-      credentials: "same-origin",
-      headers: headers,
-      body: body,
-    });
-    const text = await res.text();
-    let data = null;
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch (_) {
-      data = text;
-    }
-    if (res.status === 401) {
-      clearTokens();
-      window.location.href = "/login/";
-      throw new Error("Unauthorized");
-    }
-    if (!res.ok) {
-      let msg = res.status + " " + res.statusText;
-      if (data && typeof data.detail === "string") msg = data.detail;
-      else if (data && data.detail) msg = JSON.stringify(data.detail);
-      else if (data && typeof data === "object") msg = JSON.stringify(data);
-      throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
-    }
-    return data;
-  }
-
-  async function bootstrapSessionJwt() {
-    clearTokens();
-    const data = await apiFetch("/api/auth/session-token/", {
-      method: "POST",
-      body: {},
-    });
-    setTokens(data.access, data.refresh);
-  }
 
   function chatPkFromUrl(url) {
     const m = String(url).match(/\/chats\/(\d+)\/?$/);
@@ -181,167 +113,6 @@
     }
   }
 
-  function insertAtCursor(textarea, text) {
-    if (!textarea || typeof text !== "string") return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const before = textarea.value.substring(0, start);
-    const after = textarea.value.substring(end);
-    textarea.value = before + text + after;
-    const pos = start + text.length;
-    textarea.selectionStart = textarea.selectionEnd = pos;
-  }
-
-  function initEmojiPicker() {
-    const btn = document.getElementById("btn-emoji");
-    const host = document.getElementById("emoji-picker-host");
-    const composer = els.composer;
-    if (!btn || !host || !composer) return;
-
-    /** Viewport-fixed placement — avoids broken absolute anchors inside nested flex / overflow stacks. */
-    function layoutEmojiPopover() {
-      if (host.classList.contains("hidden")) return;
-      const rect = btn.getBoundingClientRect();
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const margin = 8;
-      const pickerEl = host.firstElementChild;
-      let pw =
-        pickerEl && pickerEl.offsetWidth
-          ? pickerEl.offsetWidth
-          : Math.min(352, vw - 2 * margin);
-      let ph =
-        pickerEl && pickerEl.offsetHeight
-          ? pickerEl.offsetHeight
-          : Math.min(360, vh - 2 * margin);
-
-      const spaceAbove = rect.top - margin;
-      const spaceBelow = vh - rect.bottom - margin;
-      const preferAbove = spaceAbove >= ph || spaceAbove >= spaceBelow;
-
-      let top;
-      if (preferAbove) {
-        top = rect.top - margin - ph;
-        if (top < margin) top = margin;
-      } else {
-        top = rect.bottom + margin;
-        if (top + ph > vh - margin) {
-          top = Math.max(margin, vh - margin - ph);
-        }
-      }
-
-      let left = rect.right - pw;
-      if (left < margin) left = margin;
-      if (left + pw > vw - margin) left = vw - margin - pw;
-
-      host.style.top = top + "px";
-      host.style.left = left + "px";
-      host.style.right = "auto";
-      host.style.bottom = "auto";
-    }
-
-    function scheduleLayout() {
-      requestAnimationFrame(function () {
-        requestAnimationFrame(layoutEmojiPopover);
-      });
-    }
-
-    function setOpen(open) {
-      if (open) {
-        host.classList.remove("hidden");
-        btn.setAttribute("aria-expanded", "true");
-        host.setAttribute("aria-hidden", "false");
-        scheduleLayout();
-      } else {
-        host.classList.add("hidden");
-        btn.setAttribute("aria-expanded", "false");
-        host.setAttribute("aria-hidden", "true");
-      }
-    }
-
-    function closePicker() {
-      setOpen(false);
-    }
-
-    (async function () {
-      try {
-        await import(/* webpackIgnore: true */ EMOJI_PICKER_MODULE);
-      } catch (e) {
-        console.error("emoji-picker-element failed to load", e);
-        btn.disabled = true;
-        btn.title = "Emoji picker unavailable";
-        return;
-      }
-
-      document.body.appendChild(host);
-
-      host.innerHTML = "";
-      const picker = document.createElement("emoji-picker");
-      picker.style.height = "min(360px, calc(100vh - 2rem))";
-      picker.style.width = "min(352px, calc(100vw - 2rem))";
-      picker.style.boxShadow =
-        "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)";
-      picker.style.borderRadius = "0.75rem";
-      host.appendChild(picker);
-
-      if (typeof ResizeObserver !== "undefined") {
-        const ro = new ResizeObserver(function () {
-          if (!host.classList.contains("hidden")) layoutEmojiPopover();
-        });
-        ro.observe(picker);
-      }
-
-      function onScrollOrResize() {
-        layoutEmojiPopover();
-      }
-      window.addEventListener("resize", onScrollOrResize);
-      if (els.thread)
-        els.thread.addEventListener("scroll", onScrollOrResize, {
-          passive: true,
-        });
-      if (els.convList)
-        els.convList.addEventListener("scroll", onScrollOrResize, {
-          passive: true,
-        });
-
-      picker.addEventListener("emoji-click", function (event) {
-        const unicode = event.detail && event.detail.unicode;
-        if (unicode) insertAtCursor(composer, unicode);
-        composer.focus();
-        closePicker();
-      });
-
-      btn.addEventListener("click", function (ev) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        const opening = host.classList.contains("hidden");
-        setOpen(opening);
-      });
-
-      document.addEventListener(
-        "click",
-        function (ev) {
-          if (host.classList.contains("hidden")) return;
-          var path =
-            typeof ev.composedPath === "function" ? ev.composedPath() : [];
-          var i;
-          for (i = 0; i < path.length; i++) {
-            var n = path[i];
-            if (n === btn || n === host || n === picker) return;
-          }
-          closePicker();
-        },
-        true,
-      );
-
-      document.addEventListener("keydown", function (ev) {
-        if (ev.key === "Escape" && !host.classList.contains("hidden")) {
-          closePicker();
-          btn.focus();
-        }
-      });
-    })();
-  }
 
   function participantTitle(chat) {
     const names = (chat.users || [])
@@ -561,7 +332,7 @@
           if (ch) syncChatHeader(ch);
           if (
             els.chatMembersModal &&
-            !els.chatMembersModal.classList.contains("hidden")
+            isDialogOpen(els.chatMembersModal)
           ) {
             renderChatMembersPanel();
           }
@@ -573,7 +344,7 @@
     }
     if (
       els.peopleModal &&
-      !els.peopleModal.classList.contains("hidden")
+      isDialogOpen(els.peopleModal)
     ) {
       refreshPeoplePanels();
       refreshPeopleSearchDomOnly();
@@ -640,17 +411,43 @@
         return;
       }
       connectSocialWs();
-      let n = 0;
-      const iv = setInterval(function () {
-        n++;
-        if (socialWs && socialWs.readyState === WebSocket.OPEN) {
-          clearInterval(iv);
-          resolve();
-        } else if (n > 200) {
-          clearInterval(iv);
-          reject(new Error("Social socket failed to connect."));
-        }
-      }, 50);
+      if (!socialWs) {
+        reject(new Error("Social socket failed to initialize."));
+        return;
+      }
+      if (socialWs.readyState === WebSocket.OPEN) {
+        resolve();
+        return;
+      }
+      if (socialWs.readyState !== WebSocket.CONNECTING) {
+        reject(new Error("Social socket not connecting."));
+        return;
+      }
+      const timeoutId = setTimeout(function () {
+        cleanup();
+        reject(new Error("Social socket failed to connect."));
+      }, 10000);
+      function cleanup() {
+        clearTimeout(timeoutId);
+        socialWs.removeEventListener("open", onOpen);
+        socialWs.removeEventListener("error", onError);
+        socialWs.removeEventListener("close", onClose);
+      }
+      function onOpen() {
+        cleanup();
+        resolve();
+      }
+      function onError() {
+        cleanup();
+        reject(new Error("Social socket failed to connect."));
+      }
+      function onClose() {
+        cleanup();
+        reject(new Error("Social socket closed while connecting."));
+      }
+      socialWs.addEventListener("open", onOpen);
+      socialWs.addEventListener("error", onError);
+      socialWs.addEventListener("close", onClose);
     });
   }
 
@@ -707,7 +504,7 @@
               if (ch) syncChatHeader(ch);
               if (
                 els.chatMembersModal &&
-                !els.chatMembersModal.classList.contains("hidden")
+                isDialogOpen(els.chatMembersModal)
               ) {
                 renderChatMembersPanel();
               }
@@ -826,6 +623,7 @@
   }
 
   async function selectChat(pk) {
+    const seq = ++selectChatSeq;
     selectedChatPk = pk;
     renderConversationList(els.convSearch.value);
     const chat = chatsCache.find(function (c) {
@@ -842,6 +640,7 @@
     const msgs = await apiFetch("/api/chats/" + pk + "/messages/", {
       method: "GET",
     });
+    if (seq !== selectChatSeq || String(selectedChatPk) !== String(pk)) return;
     renderMessages(pk, msgs);
 
     connectWs(pk);
@@ -859,15 +658,18 @@
     const pk = selectedChatPk;
     const text = (els.composer.value || "").trim();
     if (!pk || !text) return;
-    await apiFetch("/api/chats/" + pk + "/messages/", {
+    const created = await apiFetch("/api/chats/" + pk + "/messages/", {
       method: "POST",
       body: { content: text },
     });
     els.composer.value = "";
-    const msgs = await apiFetch("/api/chats/" + pk + "/messages/", {
-      method: "GET",
-    });
-    renderMessages(pk, msgs);
+    appendBubble(
+      currentUsername,
+      created && created.content ? created.content : text,
+      created && created.created_at ? created.created_at : new Date().toISOString(),
+      false,
+      created ? created.attachment_url : null,
+    );
     await loadChats();
   }
 
@@ -876,20 +678,27 @@
     if (!pk || !fileList || !fileList.length) return;
     const caption = (els.composer.value || "").trim();
     const files = Array.prototype.slice.call(fileList);
+    const sent = [];
     for (let i = 0; i < files.length; i++) {
       const fd = new FormData();
       if (caption && i === 0) fd.append("content", caption);
       fd.append("attachment", files[i], files[i].name);
-      await apiFetch("/api/chats/" + pk + "/messages/", {
+      const created = await apiFetch("/api/chats/" + pk + "/messages/", {
         method: "POST",
         body: fd,
       });
+      sent.push(created);
     }
     els.composer.value = "";
-    const msgs = await apiFetch("/api/chats/" + pk + "/messages/", {
-      method: "GET",
+    sent.forEach(function (msg) {
+      appendBubble(
+        currentUsername,
+        msg && msg.content ? msg.content : "",
+        msg && msg.created_at ? msg.created_at : new Date().toISOString(),
+        false,
+        msg ? msg.attachment_url : null,
+      );
     });
-    renderMessages(pk, msgs);
     await loadChats();
   }
 
@@ -950,6 +759,31 @@
     );
   }
 
+  function createActionButton(label, className, onClick) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = className;
+    btn.textContent = label;
+    if (typeof onClick === "function") {
+      btn.addEventListener("click", onClick);
+    }
+    return btn;
+  }
+
+  function appendUserRow(listEl, rowClassName, username, actionBuilder) {
+    const li = document.createElement("li");
+    li.className = rowClassName;
+    const span = document.createElement("span");
+    span.className = "truncate text-sm font-medium text-slate-800";
+    span.textContent = username;
+    li.appendChild(span);
+    const actions = document.createElement("div");
+    actions.className = "flex shrink-0 gap-1";
+    actionBuilder(actions, username);
+    li.appendChild(actions);
+    listEl.appendChild(li);
+  }
+
   function renderIncomingRequests() {
     if (!els.incomingRequestsList || !els.incomingRequestsEmpty) return;
     els.incomingRequestsList.innerHTML = "";
@@ -962,44 +796,35 @@
     els.incomingRequestsEmpty.classList.add("hidden");
     els.incomingRequestsList.classList.remove("hidden");
     names.forEach(function (uname) {
-      const li = document.createElement("li");
-      li.className =
-        "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2";
-
-      const span = document.createElement("span");
-      span.className = "text-sm font-medium text-slate-800";
-      span.textContent = uname;
-
-      const actions = document.createElement("div");
-      actions.className = "flex shrink-0 gap-1";
-
-      const btnAccept = document.createElement("button");
-      btnAccept.type = "button";
-      btnAccept.className =
-        "rounded-lg bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-500";
-      btnAccept.textContent = "Accept";
-      btnAccept.addEventListener("click", function () {
-        acceptFriendRequest(uname).catch(function (err) {
-          alert(err.message || "Could not accept.");
-        });
-      });
-
-      const btnDecline = document.createElement("button");
-      btnDecline.type = "button";
-      btnDecline.className =
-        "rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50";
-      btnDecline.textContent = "Decline";
-      btnDecline.addEventListener("click", function () {
-        cancelFriendRequest(uname).catch(function (err) {
-          alert(err.message || "Could not decline.");
-        });
-      });
-
-      actions.appendChild(btnAccept);
-      actions.appendChild(btnDecline);
-      li.appendChild(span);
-      li.appendChild(actions);
-      els.incomingRequestsList.appendChild(li);
+      appendUserRow(
+        els.incomingRequestsList,
+        "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2",
+        uname,
+        function (actions) {
+          actions.appendChild(
+            createActionButton(
+              "Accept",
+              "rounded-lg bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-500",
+              function () {
+                acceptFriendRequest(uname).catch(function (err) {
+                  alert(err.message || "Could not accept.");
+                });
+              },
+            ),
+          );
+          actions.appendChild(
+            createActionButton(
+              "Decline",
+              "rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50",
+              function () {
+                cancelFriendRequest(uname).catch(function (err) {
+                  alert(err.message || "Could not decline.");
+                });
+              },
+            ),
+          );
+        },
+      );
     });
   }
 
@@ -1015,38 +840,29 @@
     els.outgoingRequestsEmpty.classList.add("hidden");
     els.outgoingRequestsList.classList.remove("hidden");
     names.forEach(function (uname) {
-      const li = document.createElement("li");
-      li.className =
-        "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2";
-
-      const span = document.createElement("span");
-      span.className = "truncate text-sm font-medium text-slate-800";
-      span.textContent = uname;
-
-      const btnCancel = document.createElement("button");
-      btnCancel.type = "button";
-      btnCancel.className =
-        "shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100";
-      btnCancel.textContent = "Cancel";
-      btnCancel.title = "Withdraw friend request";
-      btnCancel.addEventListener("click", function () {
-        cancelFriendRequest(uname).catch(function (err) {
-          alert(err.message || "Could not cancel.");
-        });
-      });
-
-      const pending = document.createElement("span");
-      pending.className = "text-xs text-slate-500";
-      pending.textContent = "Pending";
-
-      const actions = document.createElement("div");
-      actions.className = "flex shrink-0 items-center gap-2";
-      actions.appendChild(pending);
-      actions.appendChild(btnCancel);
-
-      li.appendChild(span);
-      li.appendChild(actions);
-      els.outgoingRequestsList.appendChild(li);
+      appendUserRow(
+        els.outgoingRequestsList,
+        "flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2",
+        uname,
+        function (actions) {
+          actions.className = "flex shrink-0 items-center gap-2";
+          const pending = document.createElement("span");
+          pending.className = "text-xs text-slate-500";
+          pending.textContent = "Pending";
+          actions.appendChild(pending);
+          const btnCancel = createActionButton(
+            "Cancel",
+            "shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100",
+            function () {
+              cancelFriendRequest(uname).catch(function (err) {
+                alert(err.message || "Could not cancel.");
+              });
+            },
+          );
+          btnCancel.title = "Withdraw friend request";
+          actions.appendChild(btnCancel);
+        },
+      );
     });
   }
 
@@ -1057,14 +873,12 @@
   }
 
   function closePeopleModal() {
-    if (els.peopleModal) els.peopleModal.classList.add("hidden");
-    document.body.classList.remove("overflow-hidden");
+    closeDialog(els.peopleModal);
   }
 
   function openPeopleModal() {
     if (!els.peopleModal) return;
-    els.peopleModal.classList.remove("hidden");
-    document.body.classList.add("overflow-hidden");
+    openDialog(els.peopleModal);
     if (els.peopleSearch) els.peopleSearch.value = "";
     if (els.peopleSearchResults) els.peopleSearchResults.innerHTML = "";
     cachedPeopleSearchQuery = "";
@@ -1087,40 +901,31 @@
     }
     els.friendsEmpty.classList.add("hidden");
     names.forEach(function (uname) {
-      const li = document.createElement("li");
-      li.className =
-        "flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2";
-
-      const span = document.createElement("span");
-      span.className = "truncate text-sm font-medium text-slate-800";
-      span.textContent = uname;
-
-      const actions = document.createElement("div");
-      actions.className = "flex shrink-0 gap-1";
-
-      const btnChat = document.createElement("button");
-      btnChat.type = "button";
-      btnChat.className =
-        "rounded-lg bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-500";
-      btnChat.textContent = "Chat";
-      btnChat.addEventListener("click", function () {
-        openOrSelectDm(uname);
-      });
-
-      const btnRm = document.createElement("button");
-      btnRm.type = "button";
-      btnRm.className =
-        "rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-white";
-      btnRm.textContent = "Remove";
-      btnRm.addEventListener("click", function () {
-        removeFriend(uname);
-      });
-
-      actions.appendChild(btnChat);
-      actions.appendChild(btnRm);
-      li.appendChild(span);
-      li.appendChild(actions);
-      els.friendsList.appendChild(li);
+      appendUserRow(
+        els.friendsList,
+        "flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2",
+        uname,
+        function (actions) {
+          actions.appendChild(
+            createActionButton(
+              "Chat",
+              "rounded-lg bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-500",
+              function () {
+                openOrSelectDm(uname);
+              },
+            ),
+          );
+          actions.appendChild(
+            createActionButton(
+              "Remove",
+              "rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-white",
+              function () {
+                removeFriend(uname);
+              },
+            ),
+          );
+        },
+      );
     });
   }
 
@@ -1305,18 +1110,15 @@
   }
 
   function closeInviteModal() {
-    if (els.inviteModal) els.inviteModal.classList.add("hidden");
-    document.body.classList.remove("overflow-hidden");
+    closeDialog(els.inviteModal);
   }
 
   function closeChatMembersModal() {
-    if (els.chatMembersModal) els.chatMembersModal.classList.add("hidden");
-    document.body.classList.remove("overflow-hidden");
+    closeDialog(els.chatMembersModal);
   }
 
   function closeRenameChatModal() {
-    if (els.renameChatModal) els.renameChatModal.classList.add("hidden");
-    document.body.classList.remove("overflow-hidden");
+    closeDialog(els.renameChatModal);
   }
 
   function openRenameChatModal() {
@@ -1333,8 +1135,7 @@
     const stored =
       chat.title != null && chat.title !== undefined ? String(chat.title).trim() : "";
     els.renameChatInput.value = stored;
-    els.renameChatModal.classList.remove("hidden");
-    document.body.classList.add("overflow-hidden");
+    openDialog(els.renameChatModal);
     els.renameChatInput.focus();
     els.renameChatInput.select();
   }
@@ -1365,8 +1166,7 @@
       return chatPkFromUrl(c.url) === String(selectedChatPk);
     });
     if (!chat || !chat.is_admin) return;
-    els.inviteModal.classList.remove("hidden");
-    document.body.classList.add("overflow-hidden");
+    openDialog(els.inviteModal);
     els.inviteFriendsList.innerHTML = "";
     if (els.inviteFriendsEmpty) els.inviteFriendsEmpty.classList.add("hidden");
 
@@ -1465,12 +1265,21 @@
     });
     if (!chat || (chat.users || []).length < 2) return;
     renderChatMembersPanel();
-    els.chatMembersModal.classList.remove("hidden");
-    document.body.classList.add("overflow-hidden");
+    openDialog(els.chatMembersModal);
   }
 
-  initEmojiPicker();
+  initEmojiPicker({
+    button: els.btnEmoji,
+    host: els.emojiHost,
+    composer: els.composer,
+    thread: els.thread,
+    convList: els.convList,
+  });
   initAttachmentPicker();
+  wireDialogDismiss(els.renameChatModal, [els.renameChatCancel]);
+  wireDialogDismiss(els.inviteModal, [els.inviteModalClose]);
+  wireDialogDismiss(els.chatMembersModal, [els.chatMembersModalClose]);
+  wireDialogDismiss(els.peopleModal, [els.peopleModalClose]);
 
   if (els.btnInviteChat)
     els.btnInviteChat.addEventListener("click", function () {
@@ -1480,37 +1289,18 @@
     els.btnRenameChat.addEventListener("click", function () {
       openRenameChatModal();
     });
-  if (els.renameChatBackdrop)
-    els.renameChatBackdrop.addEventListener("click", closeRenameChatModal);
-  if (els.renameChatCancel)
-    els.renameChatCancel.addEventListener("click", closeRenameChatModal);
   if (els.renameChatSave)
     els.renameChatSave.addEventListener("click", function () {
       saveRenameChatTitle().catch(function () {});
     });
-  if (els.inviteModalClose)
-    els.inviteModalClose.addEventListener("click", closeInviteModal);
-  if (els.inviteModalBackdrop)
-    els.inviteModalBackdrop.addEventListener("click", closeInviteModal);
 
   if (els.btnChatMembers)
     els.btnChatMembers.addEventListener("click", function () {
       openChatMembersModal().catch(function () {});
     });
-  if (els.chatMembersModalClose)
-    els.chatMembersModalClose.addEventListener("click", closeChatMembersModal);
-  if (els.chatMembersModalBackdrop)
-    els.chatMembersModalBackdrop.addEventListener(
-      "click",
-      closeChatMembersModal,
-    );
 
   if (els.btnOpenPeople)
     els.btnOpenPeople.addEventListener("click", openPeopleModal);
-  if (els.peopleModalClose)
-    els.peopleModalClose.addEventListener("click", closePeopleModal);
-  if (els.peopleModalBackdrop)
-    els.peopleModalBackdrop.addEventListener("click", closePeopleModal);
   if (els.peopleSearch) {
     els.peopleSearch.addEventListener("input", function () {
       clearTimeout(searchDebounceTimer);
@@ -1529,4 +1319,3 @@
       console.error(err);
       alert("Could not start messaging session. Try signing in again.");
     });
-})();

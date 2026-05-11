@@ -135,16 +135,10 @@
     <div id="emoji-picker-host"
          class="fixed z-[100] hidden pointer-events-auto"
          aria-hidden="true"></div>
-    <div id="rename-chat-modal"
-         class="fixed inset-0 z-50 hidden"
-         aria-modal="true"
-         role="dialog"
-         aria-labelledby="rename-chat-modal-title">
-        <button type="button"
-                id="rename-chat-modal-backdrop"
-                class="absolute inset-0 bg-slate-900/40"
-                aria-label="Close dialog"></button>
-        <div class="relative mx-auto mt-[18vh] w-full max-w-md rounded-2xl bg-white px-5 py-4 shadow-xl">
+    <dialog id="rename-chat-modal"
+            class="z-50 m-auto w-full max-w-md rounded-2xl border-0 bg-white px-5 py-4 shadow-xl backdrop:bg-slate-900/40"
+            aria-labelledby="rename-chat-modal-title">
+        <div class="relative">
             <h2 id="rename-chat-modal-title"
                 class="text-lg font-semibold text-slate-900">Chat name</h2>
             <p class="mt-1 text-xs text-slate-500">Shown to everyone in this chat. Leave blank to use participant names.</p>
@@ -166,17 +160,11 @@
                 </button>
             </div>
         </div>
-    </div>
-    <div id="chat-members-modal"
-         class="fixed inset-0 z-50 hidden"
-         aria-modal="true"
-         role="dialog"
-         aria-labelledby="chat-members-modal-title">
-        <button type="button"
-                id="chat-members-modal-backdrop"
-                class="absolute inset-0 bg-slate-900/40"
-                aria-label="Close dialog"></button>
-        <div class="relative mx-auto mt-[12vh] flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+    </dialog>
+    <dialog id="chat-members-modal"
+            class="z-50 m-auto w-full max-w-md overflow-hidden rounded-2xl border-0 bg-white shadow-xl backdrop:bg-slate-900/40"
+            aria-labelledby="chat-members-modal-title">
+        <div class="relative flex max-h-[80vh] flex-col">
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <h2 id="chat-members-modal-title"
                     class="text-lg font-semibold text-slate-900">People in this chat</h2>
@@ -190,17 +178,11 @@
                 </ul>
             </div>
         </div>
-    </div>
-    <div id="invite-modal"
-         class="fixed inset-0 z-50 hidden"
-         aria-modal="true"
-         role="dialog"
-         aria-labelledby="invite-modal-title">
-        <button type="button"
-                id="invite-modal-backdrop"
-                class="absolute inset-0 bg-slate-900/40"
-                aria-label="Close dialog"></button>
-        <div class="relative mx-auto mt-[12vh] flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+    </dialog>
+    <dialog id="invite-modal"
+            class="z-50 m-auto w-full max-w-md overflow-hidden rounded-2xl border-0 bg-white shadow-xl backdrop:bg-slate-900/40"
+            aria-labelledby="invite-modal-title">
+        <div class="relative flex max-h-[80vh] flex-col">
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <h2 id="invite-modal-title" class="text-lg font-semibold text-slate-900">Invite to chat</h2>
                 <button type="button"
@@ -215,17 +197,11 @@
                 </ul>
             </div>
         </div>
-    </div>
-    <div id="people-modal"
-         class="fixed inset-0 z-50 hidden"
-         aria-modal="true"
-         role="dialog"
-         aria-labelledby="people-modal-title">
-        <button type="button"
-                id="people-modal-backdrop"
-                class="absolute inset-0 bg-slate-900/40"
-                aria-label="Close dialog"></button>
-        <div class="relative mx-auto mt-[8vh] flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+    </dialog>
+    <dialog id="people-modal"
+            class="z-50 m-auto w-full max-w-md overflow-hidden rounded-2xl border-0 bg-white shadow-xl backdrop:bg-slate-900/40"
+            aria-labelledby="people-modal-title">
+        <div class="relative flex max-h-[85vh] flex-col">
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <h2 id="people-modal-title" class="text-lg font-semibold text-slate-900">Friends &amp; chats</h2>
                 <button type="button"
@@ -261,6 +237,6 @@
                 </ul>
             </div>
         </div>
-    </div>
-    <script src="{% static 'theme/js/chat_app.js' %}"></script>
+    </dialog>
+    <script type="module" src="{% static 'theme/js/chat_app.js' %}"></script>
 {% endblock app_content %}

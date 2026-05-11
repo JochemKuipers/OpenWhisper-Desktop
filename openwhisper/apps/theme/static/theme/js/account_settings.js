@@ -12,32 +12,6 @@
         box.textContent = msg;
     }
 
-    function setField(id, value) {
-        const el = document.getElementById(id);
-        if (el && value !== undefined && value !== null) el.value = value;
-    }
-
-    async function loadProfile() {
-        const r = await fetch("/api/users/me/", {
-            credentials: "same-origin",
-            headers: { Accept: "application/json" },
-        });
-        if (!r.ok) {
-            showStatus("err", "Could not load profile (" + r.status + ").");
-            return;
-        }
-        const d = await r.json();
-        setField("pf-username", d.username);
-        setField("pf-email", d.email || "");
-        setField("pf-first", d.first_name || "");
-        setField("pf-last", d.last_name || "");
-        setField("pf-bio", d.bio || "");
-        setField("pf-phone", d.phone_number || "");
-        setField("pf-location", d.location || "");
-        setField("pf-gender", d.gender || "");
-        if (d.birth_date) setField("pf-birth", d.birth_date);
-    }
-
     const form = document.getElementById("profile-form");
     if (!form) return;
 
@@ -49,10 +23,6 @@
             avatarFilename.textContent = f ? f.name : "No file chosen";
         });
     }
-
-    loadProfile().catch(function () {
-        showStatus("err", "Failed to load profile.");
-    });
 
     form.addEventListener("submit", async function (e) {
         e.preventDefault();
@@ -83,7 +53,6 @@
                 return;
             }
             showStatus("ok", "Saved.");
-            loadProfile();
         } catch (err) {
             showStatus("err", err.message || "Network error.");
         }

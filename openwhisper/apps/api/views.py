@@ -233,6 +233,10 @@ class StartDmChatAPIView(APIView):
         chat = Chat.objects.create(created_by=request.user)
         chat.users.add(request.user, other)
         chat = _chat_detail_prefetched(chat.pk)
+        member_ids = list(chat.users.values_list("pk", flat=True))
+        dispatch_social_events(
+            [(uid, {"type": "chat_updated", "chat_id": chat.pk}) for uid in member_ids]
+        )
         return Response(ChatSerializer(chat, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
@@ -449,6 +453,12 @@ class ChatMessagesAPIView(APIView):
             sender=request.user,
             content=content,
             attachment=attachment if attachment else None,
+        )
+        # Notify all members (including users not joined to this chat websocket yet)
+        # so conversation lists refresh immediately without a full page reload.
+        member_ids = list(chat.users.values_list("pk", flat=True))
+        dispatch_social_events(
+            [(uid, {"type": "chat_updated", "chat_id": chat.pk}) for uid in member_ids]
         )
         serializer = MessageSerializer(message, context={"request": request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
