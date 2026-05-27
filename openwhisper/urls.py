@@ -20,8 +20,17 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import URLPattern, URLResolver, include, path
+from django.views.generic import TemplateView
 
 urlpatterns: list[URLPattern | URLResolver] = [
+    path(
+        "robots.txt",
+        TemplateView.as_view(
+            template_name="robots.txt",
+            content_type="text/plain",
+        ),
+        name="robots",
+    ),
     path("admin/", admin.site.urls),
     path("api/", include("openwhisper.apps.api.urls")),
     path("api-auth/", include("rest_framework.urls", namespace="rest_framework")),

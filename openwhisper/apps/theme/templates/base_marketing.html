@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
 {% block extra_head %}
-    <meta name="description"
-          content="{% block meta_description %}OpenWhisper is a privacy-minded messaging stack: Django API, real-time Channels, and modern web UI.{% endblock %}">
     <link rel="canonical" href="{{ request.build_absolute_uri }}">
     <meta name="robots"
           content="{% block meta_robots %}index,follow{% endblock meta_robots %}">
