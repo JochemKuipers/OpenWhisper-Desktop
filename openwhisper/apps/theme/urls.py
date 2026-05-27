@@ -19,7 +19,7 @@ urlpatterns = [
     path("app/", ChatAppView.as_view(), name="chat-app"),
     path(
         "labs/chat/",
-        RedirectView.as_view(pattern_name="chat-app", permanent=False),
+        RedirectView.as_view(pattern_name="chat-app", permanent=True),
         name="chat-lab-redirect",
     ),
 ]

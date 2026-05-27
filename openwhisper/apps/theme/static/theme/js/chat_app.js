@@ -565,7 +565,7 @@ const currentUsername = root.dataset.currentUser || "";
       if (isProbablyImageUrl(abs)) {
         const img = document.createElement("img");
         img.src = abs;
-        img.alt = "";
+        img.alt = "Chat attachment";
         img.loading = "lazy";
         img.className =
           (content ? "mt-2" : "mt-1") +

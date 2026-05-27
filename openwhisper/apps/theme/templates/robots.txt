@@ -1,0 +1,9 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /api/
+Disallow: /api-auth/
+Disallow: /app/
+Disallow: /account/
+Disallow: /login/
+Disallow: /register/
+Disallow: /media/
