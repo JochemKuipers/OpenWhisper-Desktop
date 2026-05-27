@@ -39,7 +39,7 @@
             }
         </script>
     {% endblock json_ld %}
-{% endblock %}
+{% endblock extra_head %}
 {% block body %}
     <div class="flex min-h-screen flex-col">
         <header class="border-b border-slate-200 bg-white">
@@ -70,6 +70,16 @@
         </main>
         <footer class="border-t border-slate-200 bg-white py-8 text-center text-sm text-slate-500">
             <p>© {% now "Y" %} OpenWhisper. Built for privacy-aware messaging.</p>
+            <p class="mt-2">
+                Powered by
+                <a href="https://www.djangoproject.com/"
+                   class="text-blue-600 hover:text-blue-500"
+                   rel="noopener noreferrer">Django</a>
+                and
+                <a href="https://channels.readthedocs.io/"
+                   class="text-blue-600 hover:text-blue-500"
+                   rel="noopener noreferrer">Django Channels</a>.
+            </p>
         </footer>
     </div>
 {% endblock body %}

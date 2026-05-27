@@ -1,18 +1,19 @@
 {% extends "base_marketing.html" %}
 {% load static %}
 
-{% block title %}OpenWhisper — Private messaging with Django &amp; WebSockets{% endblock %}
-{% block meta_description %}OpenWhisper combines a Django REST API, JWT and session auth, Redis-backed WebSockets, and a fast Tailwind UI for real-time conversations you control.{% endblock %}
-{% block og_title %}OpenWhisper — Private messaging{% endblock %}
-{% block og_description %}Real-time chat on a modern Django stack: REST, Channels, SimpleJWT, and a lightweight web client.{% endblock %}
-{% block twitter_title %}OpenWhisper — Private messaging{% endblock %}
-{% block twitter_description %}Real-time messaging with Django, WebSockets, and a privacy-first mindset.{% endblock %}
+{% block title %}OpenWhisper — Private messaging{% endblock title %}
+{% block meta_keywords %}private messaging, OpenWhisper, Django, WebSockets, self-hosted chat{% endblock meta_keywords %}
+{% block meta_description %}OpenWhisper: private messaging on your servers. Django REST, JWT, WebSockets and Tailwind for self-hosted real-time chat you control.{% endblock meta_description %}
+{% block og_title %}OpenWhisper — Private messaging{% endblock og_title %}
+{% block og_description %}Real-time private messaging on a modern Django stack: REST, Channels, SimpleJWT, and a lightweight web client.{% endblock og_description %}
+{% block twitter_title %}OpenWhisper — Private messaging{% endblock twitter_title %}
+{% block twitter_description %}Real-time private messaging with Django, WebSockets, and a privacy-first mindset.{% endblock twitter_description %}
 
 {% block content %}
     <section class="mx-auto max-w-6xl px-4 py-16 text-center">
-        <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">Messaging you can ship and audit</h1>
+        <h1 class="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl">Private messaging you can ship and audit</h1>
         <p class="mx-auto mt-6 max-w-2xl text-lg text-slate-600">
-            OpenWhisper is an open, self-hostable foundation for private chat: PostgreSQL for history, Redis for real-time fan-out,
+            OpenWhisper is an open, self-hostable foundation for private messaging: PostgreSQL for history, Redis for real-time fan-out,
             and clear API boundaries so your data stays on your infrastructure.
         </p>
         <div class="mt-10 flex flex-wrap justify-center gap-4">
@@ -34,7 +35,7 @@
     <section class="border-y border-slate-200 bg-white py-16">
         <div class="mx-auto grid max-w-6xl gap-12 px-4 md:grid-cols-3">
             <article>
-                <h2 class="text-lg font-semibold text-slate-900">Own your stack</h2>
+                <h2 class="text-lg font-semibold text-slate-900">Private messaging on your stack</h2>
                 <p class="mt-3 text-sm leading-relaxed text-slate-600">
                     Run API, workers, and database where you trust them—no opaque SaaS dependency for core messaging flows.
                 </p>
@@ -54,6 +55,36 @@
         </div>
     </section>
 
+    <section class="mx-auto max-w-3xl px-4 py-16">
+        <h2 class="text-2xl font-semibold text-slate-900">Why self-hosted private messaging?</h2>
+        <p class="mt-4 text-sm leading-relaxed text-slate-600">
+            Many teams need chat without surrendering message history to a third-party cloud. OpenWhisper keeps conversations on servers you operate,
+            with a transparent Django codebase you can review in class or at work. You choose where PostgreSQL runs, how Redis is secured,
+            and which users may register—ideal for labs, demos, and privacy-sensitive prototypes.
+        </p>
+        <p class="mt-4 text-sm leading-relaxed text-slate-600">
+            The web client talks to a REST API for history and uploads, while
+            <a href="https://channels.readthedocs.io/"
+               class="text-blue-600 hover:text-blue-500"
+               rel="noopener noreferrer">Django Channels</a>
+            delivers live updates over WebSockets. Friends, direct messages, and group chats share the same stack,
+            so you learn one architecture instead of bolting on separate services. Start on localhost, then deploy
+            behind your own reverse proxy when you are ready.
+        </p>
+        <p class="mt-4 text-sm leading-relaxed text-slate-600">
+            Whether you compare hosting options or document SEO for a school assignment, a single landing page explains the product while
+            the authenticated app stays out of search indexes—a common pattern for SaaS and internal tools.
+        </p>
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">What is in the stack?</h3>
+        <p class="mt-3 text-sm leading-relaxed text-slate-600">
+            OpenWhisper pairs a Django 5 backend with PostgreSQL for durable message storage and Redis for channel layers,
+            so WebSocket consumers stay responsive when several users chat at once. Session cookies protect the HTML shell,
+            while SimpleJWT issues tokens for API calls and socket authentication—patterns you can document in class or reuse
+            for mobile clients later. Profiles, friend requests, direct messages, and group chats all share the same REST
+            and real-time pipeline, which keeps deployment, logging, and backups straightforward for labs and small teams.
+        </p>
+    </section>
+
     <section class="mx-auto max-w-6xl px-4 py-16 text-center">
         <h2 class="text-2xl font-semibold text-slate-900">Ready to try it?</h2>
         <p class="mx-auto mt-3 max-w-xl text-slate-600">
@@ -65,4 +96,4 @@
             </a>
         {% endif %}
     </section>
-{% endblock %}
+{% endblock content %}

@@ -27,3 +27,13 @@ INTERNAL_IPS = [
 ]
 
 ALLOWED_HOSTS = [*ALLOWED_HOSTS, "localhost", "127.0.0.1", "testserver"]
+
+# django-check-seo: ignore chrome that is not page content (incl. debug toolbar in dev).
+DJANGO_CHECK_SEO_EXCLUDE_CONTENT = (
+    "header, footer, nav, #djdt, [id^='djdt'], .djdt-hidden, #djDebugToolbarHandle"
+)
+
+# Landing is a product page, not a 600-word article.
+DJANGO_CHECK_SEO_SETTINGS = {
+    "content_words_number": [300, 400],
+}
