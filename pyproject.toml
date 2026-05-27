@@ -22,6 +22,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "channels[types]>=4.3.2",
+    "django-check-seo>=2.1.1",
     "django-debug-toolbar>=6.3.0",
     "django-stubs>=6.0.3",
     "django-tailwind[cookiecutter,honcho,reload]>=4.4.2",

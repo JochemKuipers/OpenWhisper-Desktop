@@ -15,7 +15,7 @@ CORS_ALLOW_METHODS = [
     "PUT",
 ]
 
-INSTALLED_APPS += ["django_browser_reload", "debug_toolbar"]
+INSTALLED_APPS += ["django_browser_reload", "debug_toolbar", "django_check_seo"]
 
 MIDDLEWARE += [
     "django_browser_reload.middleware.BrowserReloadMiddleware",
@@ -25,3 +25,5 @@ MIDDLEWARE += [
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
+
+ALLOWED_HOSTS = [*ALLOWED_HOSTS, "localhost", "127.0.0.1", "testserver"]

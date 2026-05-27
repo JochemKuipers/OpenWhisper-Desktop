@@ -42,3 +42,7 @@ if settings.DEBUG:
         from debug_toolbar.toolbar import debug_toolbar_urls
 
         urlpatterns += debug_toolbar_urls()
+    if "django_check_seo" in settings.INSTALLED_APPS:
+        urlpatterns += [
+            path("check-seo/", include("django_check_seo.urls")),
+        ]
