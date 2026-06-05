@@ -175,6 +175,77 @@ def test_social_websocket_friend_remove_notifies_both():
 
 
 @pytest.mark.django_db
+def test_chat_display_title_and_member_subtitle():
+    """Computed display_title and member_subtitle match Android parity rules."""
+    from rest_framework.test import APIRequestFactory
+
+    from openwhisper.apps.api.serializers import ChatSerializer
+
+    User = get_user_model()
+    alice = User.objects.create_user(username="disp_alice", email="disp_alice@example.com", password="pw")
+    bob = User.objects.create_user(username="disp_bob", email="disp_bob@example.com", password="pw")
+    carol = User.objects.create_user(username="disp_carol", email="disp_carol@example.com", password="pw")
+    dave = User.objects.create_user(username="disp_dave", email="disp_dave@example.com", password="pw")
+
+    factory = APIRequestFactory()
+
+    dm = Chat.objects.create(created_by=alice)
+    dm.users.add(alice, bob)
+
+    def serialize(chat, user):
+        request = factory.get("/")
+        request.user = user
+        return ChatSerializer(chat, context={"request": request}).data
+
+    alice_dm = serialize(dm, alice)
+    bob_dm = serialize(dm, bob)
+    assert alice_dm["display_title"] == "disp_bob"
+    assert bob_dm["display_title"] == "disp_alice"
+    assert alice_dm["member_subtitle"] == ""
+    assert bob_dm["member_subtitle"] == ""
+
+    group = Chat.objects.create(created_by=alice, title="")
+    group.users.add(alice, bob, carol)
+    alice_group = serialize(group, alice)
+    assert alice_group["display_title"] == "New group chat"
+    assert "You" in alice_group["member_subtitle"]
+    assert "disp_bob" in alice_group["member_subtitle"]
+    assert "disp_carol" in alice_group["member_subtitle"]
+    assert alice_group["member_subtitle"].count("You") == 1
+
+    titled = Chat.objects.create(created_by=alice, title="  Project Team  ")
+    titled.users.add(alice, bob, carol, dave)
+    assert serialize(titled, alice)["display_title"] == "Project Team"
+    assert serialize(titled, bob)["display_title"] == "Project Team"
+
+
+@pytest.mark.django_db
+def test_chat_list_returns_display_fields():
+    User = get_user_model()
+    alice = User.objects.create_user(username="api_alice", email="api_alice@example.com", password="pw")
+    bob = User.objects.create_user(username="api_bob", email="api_bob@example.com", password="pw")
+    alice.friends.add(bob)
+    bob.friends.add(alice)
+
+    a_client = APIClient()
+    a_client.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {str(RefreshToken.for_user(alice).access_token)}"
+    )
+    b_client = APIClient()
+    b_client.credentials(HTTP_AUTHORIZATION=f"Bearer {str(RefreshToken.for_user(bob).access_token)}")
+
+    r = a_client.post("/api/chats/start/", {"username": bob.username}, format="json")
+    assert r.status_code == 201
+    assert r.data["display_title"] == "api_bob"
+    assert r.data["member_subtitle"] == ""
+
+    r = b_client.get("/api/chats/")
+    assert r.status_code == 200
+    chat = next(c for c in r.data if c["display_title"] == "api_alice")
+    assert chat["member_subtitle"] == ""
+
+
+@pytest.mark.django_db
 def test_chat_admin_invite_rename_remove():
     User = get_user_model()
     alice = User.objects.create_user(username="adm_alice", email="adm_alice@example.com", password="pw")

@@ -19,6 +19,7 @@ from openwhisper.apps.api.serializers import (
     UserProfileSerializer,
     UserSerializer,
 )
+from openwhisper.apps.chat.display import build_chat_updated_events
 from openwhisper.apps.chat.friend_social import (
     friend_remove,
     friend_request_accept,
@@ -233,10 +234,7 @@ class StartDmChatAPIView(APIView):
         chat = Chat.objects.create(created_by=request.user)
         chat.users.add(request.user, other)
         chat = _chat_detail_prefetched(chat.pk)
-        member_ids = list(chat.users.values_list("pk", flat=True))
-        dispatch_social_events(
-            [(uid, {"type": "chat_updated", "chat_id": chat.pk}) for uid in member_ids]
-        )
+        dispatch_social_events(build_chat_updated_events(chat))
         return Response(ChatSerializer(chat, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
@@ -275,10 +273,7 @@ class ChatInviteAPIView(APIView):
         chat.save(update_fields=["updated_at"])
 
         refreshed = _chat_detail_prefetched(chat.pk)
-        member_ids = list(refreshed.users.values_list("pk", flat=True))
-        dispatch_social_events(
-            [(uid, {"type": "chat_updated", "chat_id": refreshed.pk}) for uid in member_ids]
-        )
+        dispatch_social_events(build_chat_updated_events(refreshed))
         broadcast_chat_message(
             chat_id=refreshed.pk,
             payload={
@@ -336,9 +331,7 @@ class ChatRemoveMemberAPIView(APIView):
         refreshed = _chat_detail_prefetched(chat.pk)
         remaining_ids = list(refreshed.users.values_list("pk", flat=True))
         notify_ids = remaining_ids + [target.pk]
-        dispatch_social_events(
-            [(uid, {"type": "chat_updated", "chat_id": refreshed.pk}) for uid in notify_ids]
-        )
+        dispatch_social_events(build_chat_updated_events(refreshed, user_ids=notify_ids))
         broadcast_chat_message(
             chat_id=refreshed.pk,
             payload={
@@ -389,10 +382,7 @@ class ChatViewSet(viewsets.ModelViewSet):
         self.perform_update(serializer)
 
         refreshed = _chat_detail_prefetched(instance.pk)
-        member_ids = list(refreshed.users.values_list("pk", flat=True))
-        dispatch_social_events(
-            [(uid, {"type": "chat_updated", "chat_id": refreshed.pk}) for uid in member_ids]
-        )
+        dispatch_social_events(build_chat_updated_events(refreshed))
         broadcast_chat_message(
             chat_id=refreshed.pk,
             payload={
@@ -456,10 +446,7 @@ class ChatMessagesAPIView(APIView):
         )
         # Notify all members (including users not joined to this chat websocket yet)
         # so conversation lists refresh immediately without a full page reload.
-        member_ids = list(chat.users.values_list("pk", flat=True))
-        dispatch_social_events(
-            [(uid, {"type": "chat_updated", "chat_id": chat.pk}) for uid in member_ids]
-        )
+        dispatch_social_events(build_chat_updated_events(chat))
         serializer = MessageSerializer(message, context={"request": request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

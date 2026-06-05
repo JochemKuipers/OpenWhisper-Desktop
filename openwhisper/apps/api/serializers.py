@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
+from openwhisper.apps.chat.display import get_display_title, get_member_subtitle
 from openwhisper.apps.chat.models import Chat, Message
 from openwhisper.apps.chat.permissions import chat_admin, is_chat_admin
 
@@ -108,12 +109,16 @@ class ChatSerializer(serializers.HyperlinkedModelSerializer):
     title = serializers.CharField(required=False, allow_blank=True, max_length=120)
     admin_username = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
+    display_title = serializers.SerializerMethodField()
+    member_subtitle = serializers.SerializerMethodField()
 
     class Meta:
         model = Chat
         fields = [
             "url",
             "title",
+            "display_title",
+            "member_subtitle",
             "users",
             "messages",
             "created_at",
@@ -129,6 +134,8 @@ class ChatSerializer(serializers.HyperlinkedModelSerializer):
             "updated_at",
             "admin_username",
             "is_admin",
+            "display_title",
+            "member_subtitle",
         ]
 
     def get_admin_username(self, obj):
@@ -140,6 +147,16 @@ class ChatSerializer(serializers.HyperlinkedModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         return is_chat_admin(request.user, obj)
+
+    def get_display_title(self, obj):
+        request = self.context.get("request")
+        user = request.user if request else None
+        return get_display_title(obj, user)
+
+    def get_member_subtitle(self, obj):
+        request = self.context.get("request")
+        user = request.user if request else None
+        return get_member_subtitle(obj, user)
 
     def validate_title(self, value):
         if value is None:
