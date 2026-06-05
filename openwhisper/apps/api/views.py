@@ -475,6 +475,14 @@ class LogoutAPIView(APIView):
         return Response({"detail": "Logged out successfully"}, status=status.HTTP_200_OK)
 
 
+class HealthCheckAPIView(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        return Response({"status": "ok"})
+
+
 class RegisterAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
