@@ -11,6 +11,24 @@ GROUP_DEFAULT_TITLE = "New group chat"
 FALLBACK_TITLE = "Chat"
 
 
+def ensure_group_default_title(chat: Chat) -> bool:
+    """Persist the default group name when a nameless chat reaches 3+ members."""
+    if chat.users.count() > 2 and not (chat.title and chat.title.strip()):
+        chat.title = GROUP_DEFAULT_TITLE
+        chat.save(update_fields=["title", "updated_at"])
+        return True
+    return False
+
+
+def revert_group_default_title_if_dm(chat: Chat) -> bool:
+    """Drop the auto-generated group title when membership falls back to 1:1."""
+    if chat.users.count() <= 2 and chat.title.strip() == GROUP_DEFAULT_TITLE:
+        chat.title = ""
+        chat.save(update_fields=["title", "updated_at"])
+        return True
+    return False
+
+
 def _chat_usernames(chat: Chat) -> list[str]:
     return [u.username for u in chat.users.all() if u.username]
 

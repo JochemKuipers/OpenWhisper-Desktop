@@ -274,6 +274,9 @@ def test_chat_admin_invite_rename_remove():
 
     r = a_client.post(f"/api/chats/{pk}/invite/", {"username": carol.username}, format="json")
     assert r.status_code == 200
+    assert r.data["title"] == "New group chat"
+    assert r.data["display_title"] == "New group chat"
+    assert "You" in r.data["member_subtitle"]
 
     r = b_client.patch(f"/api/chats/{pk}/", {"title": "No"}, format="json")
     assert r.status_code == 403
@@ -289,6 +292,36 @@ def test_chat_admin_invite_rename_remove():
 
     chat = Chat.objects.get(pk=int(pk))
     assert not chat.users.filter(pk=carol.pk).exists()
+    assert chat.title == "Team"
+
+
+@pytest.mark.django_db
+def test_group_default_title_reverts_when_back_to_dm():
+    User = get_user_model()
+    alice = User.objects.create_user(username="rev_alice", email="rev_alice@example.com", password="pw")
+    bob = User.objects.create_user(username="rev_bob", email="rev_bob@example.com", password="pw")
+    carol = User.objects.create_user(username="rev_carol", email="rev_carol@example.com", password="pw")
+    alice.friends.add(bob, carol)
+    bob.friends.add(alice, carol)
+    carol.friends.add(alice, bob)
+
+    a_client = APIClient()
+    a_client.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {str(RefreshToken.for_user(alice).access_token)}"
+    )
+
+    r = a_client.post("/api/chats/start/", {"username": bob.username}, format="json")
+    pk = str(r.data["url"]).rstrip("/").split("/")[-1]
+    r = a_client.post(f"/api/chats/{pk}/invite/", {"username": carol.username}, format="json")
+    assert r.data["title"] == "New group chat"
+
+    r = a_client.delete(f"/api/chats/{pk}/members/{carol.username}/")
+    assert r.status_code == 204
+
+    chat = Chat.objects.get(pk=int(pk))
+    assert chat.title == ""
+    r = a_client.get(f"/api/chats/{pk}/")
+    assert r.data["display_title"] == "rev_bob"
 
 
 @pytest.mark.django_db

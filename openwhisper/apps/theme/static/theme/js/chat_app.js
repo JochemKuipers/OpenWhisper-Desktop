@@ -123,12 +123,28 @@ function chatMemberSubtitle(chat) {
 	return "";
 }
 
+function formatMemberSubtitleHtml(subtitle) {
+	if (!subtitle) return "";
+	return subtitle
+		.split(", ")
+		.map((part) =>
+			part === "You"
+				? '<span class="font-semibold text-slate-700">You</span>'
+				: escapeHtml(part),
+		)
+		.join(", ");
+}
+
 function syncChatHeader(chat) {
 	if (!chat || !els.headerTitle) return;
 	const title = displayChatTitle(chat);
 	els.headerTitle.textContent = title;
 	const subtitle = chatMemberSubtitle(chat);
-	els.headerSub.textContent = subtitle || "Active";
+	if (subtitle) {
+		els.headerSub.innerHTML = formatMemberSubtitleHtml(subtitle);
+	} else {
+		els.headerSub.textContent = "Active";
+	}
 	els.headerAvatar.textContent = title.slice(0, 2).toUpperCase();
 	const memberCount = (chat.users || []).length;
 	const isAdmin = !!chat.is_admin;
@@ -256,7 +272,7 @@ function renderConversationList(filterText) {
 			"</div>" +
 			(subtitle
 				? '<p class="truncate text-xs text-slate-500">' +
-					escapeHtml(subtitle) +
+					formatMemberSubtitleHtml(subtitle) +
 					"</p>"
 				: "") +
 			'<p class="truncate text-xs text-slate-500">' +

@@ -19,7 +19,11 @@ from openwhisper.apps.api.serializers import (
     UserProfileSerializer,
     UserSerializer,
 )
-from openwhisper.apps.chat.display import build_chat_updated_events
+from openwhisper.apps.chat.display import (
+    build_chat_updated_events,
+    ensure_group_default_title,
+    revert_group_default_title_if_dm,
+)
 from openwhisper.apps.chat.friend_social import (
     friend_remove,
     friend_request_accept,
@@ -271,6 +275,7 @@ class ChatInviteAPIView(APIView):
 
         chat.users.add(invitee)
         chat.save(update_fields=["updated_at"])
+        ensure_group_default_title(chat)
 
         refreshed = _chat_detail_prefetched(chat.pk)
         dispatch_social_events(build_chat_updated_events(refreshed))
@@ -327,6 +332,7 @@ class ChatRemoveMemberAPIView(APIView):
 
         chat.users.remove(target)
         chat.save(update_fields=["updated_at"])
+        revert_group_default_title_if_dm(chat)
 
         refreshed = _chat_detail_prefetched(chat.pk)
         remaining_ids = list(refreshed.users.values_list("pk", flat=True))
@@ -411,7 +417,7 @@ class ChatMessagesAPIView(APIView):
         chat = self.get_object(chat_id)
         if not chat.users.filter(pk=request.user.pk).exists():
             return Response({"detail": "You are not a member of this chat."}, status=status.HTTP_403_FORBIDDEN)
-        messages = chat.messages.all()
+        messages = Message.objects.filter(chat=chat).order_by("created_at")
         serializer = MessageSerializer(messages, many=True, context={"request": request})
         return Response(serializer.data)
 
