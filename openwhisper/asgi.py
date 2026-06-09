@@ -41,7 +41,9 @@ def _assert_redis_available_for_channels() -> None:
 
     hosts = layer_config.get("CONFIG", {}).get("hosts", [])
     if not hosts:
-        raise RuntimeError("CHANNEL_LAYERS is configured for Redis, but no Redis hosts are set.")
+        raise RuntimeError(
+            "CHANNEL_LAYERS is configured for Redis, but no Redis hosts are set."
+        )
 
     host, port = _extract_redis_host_port(hosts[0])
     try:

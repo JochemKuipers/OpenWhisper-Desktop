@@ -4,20 +4,19 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('user', '0002_friend_request'),
+        ("user", "0002_friend_request"),
     ]
 
     operations = [
         migrations.RenameIndex(
-            model_name='friendrequest',
-            new_name='user_friend_to_user_4b2a94_idx',
-            old_name='user_fr_to_user_created_desc_idx',
+            model_name="friendrequest",
+            new_name="user_friend_to_user_4b2a94_idx",
+            old_name="user_fr_to_user_created_desc_idx",
         ),
         migrations.RenameIndex(
-            model_name='friendrequest',
-            new_name='user_friend_from_us_04e99d_idx',
-            old_name='user_fr_from_user_created_desc_idx',
+            model_name="friendrequest",
+            new_name="user_friend_from_us_04e99d_idx",
+            old_name="user_fr_from_user_created_desc_idx",
         ),
     ]

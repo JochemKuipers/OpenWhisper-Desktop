@@ -26,7 +26,9 @@ class ThemeRegisterView(FormView):
 
     def form_valid(self, form):
         form.save_user()
-        messages.success(self.request, "Account created. Sign in with your username and password.")
+        messages.success(
+            self.request, "Account created. Sign in with your username and password."
+        )
         return super().form_valid(form)
 
 

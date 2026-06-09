@@ -95,7 +95,9 @@ class Command(BaseCommand):
         orphaned = Chat.objects.annotate(user_count=Count("users")).filter(user_count=0)
         orphaned.delete()
 
-        self.stdout.write(self.style.WARNING(f"Removed {count} dummy user(s) and linked chats."))
+        self.stdout.write(
+            self.style.WARNING(f"Removed {count} dummy user(s) and linked chats.")
+        )
 
     def _ensure_dummy_users(self, User, password: str):
         specs = [
@@ -163,18 +165,20 @@ class Command(BaseCommand):
                 user.gender = spec["gender"]
                 user.birth_date = spec["birth_date"]
                 user.set_password(password)
-                user.save(update_fields=[
-                    "email",
-                    "phone_number",
-                    "first_name",
-                    "last_name",
-                    "bio",
-                    "location",
-                    "gender",
-                    "birth_date",
-                    "password",
-                    "updated_at",
-                ])
+                user.save(
+                    update_fields=[
+                        "email",
+                        "phone_number",
+                        "first_name",
+                        "last_name",
+                        "bio",
+                        "location",
+                        "gender",
+                        "birth_date",
+                        "password",
+                        "updated_at",
+                    ]
+                )
                 created = False
 
             label = "Created" if created else "Updated"

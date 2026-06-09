@@ -59,5 +59,7 @@ class Command(BaseCommand):
         user.set_password(password)
         user.save()
         self.stdout.write(
-            self.style.SUCCESS(f"Updated superuser {username!r} ({email}); password reset."),
+            self.style.SUCCESS(
+                f"Updated superuser {username!r} ({email}); password reset."
+            ),
         )

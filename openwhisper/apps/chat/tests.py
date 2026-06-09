@@ -182,10 +182,18 @@ def test_chat_display_title_and_member_subtitle():
     from openwhisper.apps.api.serializers import ChatSerializer
 
     User = get_user_model()
-    alice = User.objects.create_user(username="disp_alice", email="disp_alice@example.com", password="pw")
-    bob = User.objects.create_user(username="disp_bob", email="disp_bob@example.com", password="pw")
-    carol = User.objects.create_user(username="disp_carol", email="disp_carol@example.com", password="pw")
-    dave = User.objects.create_user(username="disp_dave", email="disp_dave@example.com", password="pw")
+    alice = User.objects.create_user(
+        username="disp_alice", email="disp_alice@example.com", password="pw"
+    )
+    bob = User.objects.create_user(
+        username="disp_bob", email="disp_bob@example.com", password="pw"
+    )
+    carol = User.objects.create_user(
+        username="disp_carol", email="disp_carol@example.com", password="pw"
+    )
+    dave = User.objects.create_user(
+        username="disp_dave", email="disp_dave@example.com", password="pw"
+    )
 
     factory = APIRequestFactory()
 
@@ -222,8 +230,12 @@ def test_chat_display_title_and_member_subtitle():
 @pytest.mark.django_db
 def test_chat_list_returns_display_fields():
     User = get_user_model()
-    alice = User.objects.create_user(username="api_alice", email="api_alice@example.com", password="pw")
-    bob = User.objects.create_user(username="api_bob", email="api_bob@example.com", password="pw")
+    alice = User.objects.create_user(
+        username="api_alice", email="api_alice@example.com", password="pw"
+    )
+    bob = User.objects.create_user(
+        username="api_bob", email="api_bob@example.com", password="pw"
+    )
     alice.friends.add(bob)
     bob.friends.add(alice)
 
@@ -232,7 +244,9 @@ def test_chat_list_returns_display_fields():
         HTTP_AUTHORIZATION=f"Bearer {str(RefreshToken.for_user(alice).access_token)}"
     )
     b_client = APIClient()
-    b_client.credentials(HTTP_AUTHORIZATION=f"Bearer {str(RefreshToken.for_user(bob).access_token)}")
+    b_client.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {str(RefreshToken.for_user(bob).access_token)}"
+    )
 
     r = a_client.post("/api/chats/start/", {"username": bob.username}, format="json")
     assert r.status_code == 201
@@ -248,9 +262,15 @@ def test_chat_list_returns_display_fields():
 @pytest.mark.django_db
 def test_chat_admin_invite_rename_remove():
     User = get_user_model()
-    alice = User.objects.create_user(username="adm_alice", email="adm_alice@example.com", password="pw")
-    bob = User.objects.create_user(username="adm_bob", email="adm_bob@example.com", password="pw")
-    carol = User.objects.create_user(username="adm_carol", email="adm_carol@example.com", password="pw")
+    alice = User.objects.create_user(
+        username="adm_alice", email="adm_alice@example.com", password="pw"
+    )
+    bob = User.objects.create_user(
+        username="adm_bob", email="adm_bob@example.com", password="pw"
+    )
+    carol = User.objects.create_user(
+        username="adm_carol", email="adm_carol@example.com", password="pw"
+    )
     alice.friends.add(bob, carol)
     bob.friends.add(alice, carol)
     carol.friends.add(alice, bob)
@@ -260,7 +280,9 @@ def test_chat_admin_invite_rename_remove():
         HTTP_AUTHORIZATION=f"Bearer {str(RefreshToken.for_user(alice).access_token)}"
     )
     b_client = APIClient()
-    b_client.credentials(HTTP_AUTHORIZATION=f"Bearer {str(RefreshToken.for_user(bob).access_token)}")
+    b_client.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {str(RefreshToken.for_user(bob).access_token)}"
+    )
 
     r = a_client.post("/api/chats/start/", {"username": bob.username}, format="json")
     assert r.status_code == 201
@@ -269,10 +291,14 @@ def test_chat_admin_invite_rename_remove():
     assert r.data["is_admin"] is True
     assert r.data["admin_username"] == alice.username
 
-    r = b_client.post(f"/api/chats/{pk}/invite/", {"username": carol.username}, format="json")
+    r = b_client.post(
+        f"/api/chats/{pk}/invite/", {"username": carol.username}, format="json"
+    )
     assert r.status_code == 403
 
-    r = a_client.post(f"/api/chats/{pk}/invite/", {"username": carol.username}, format="json")
+    r = a_client.post(
+        f"/api/chats/{pk}/invite/", {"username": carol.username}, format="json"
+    )
     assert r.status_code == 200
     assert r.data["title"] == "New group chat"
     assert r.data["display_title"] == "New group chat"
@@ -298,9 +324,15 @@ def test_chat_admin_invite_rename_remove():
 @pytest.mark.django_db
 def test_group_default_title_reverts_when_back_to_dm():
     User = get_user_model()
-    alice = User.objects.create_user(username="rev_alice", email="rev_alice@example.com", password="pw")
-    bob = User.objects.create_user(username="rev_bob", email="rev_bob@example.com", password="pw")
-    carol = User.objects.create_user(username="rev_carol", email="rev_carol@example.com", password="pw")
+    alice = User.objects.create_user(
+        username="rev_alice", email="rev_alice@example.com", password="pw"
+    )
+    bob = User.objects.create_user(
+        username="rev_bob", email="rev_bob@example.com", password="pw"
+    )
+    carol = User.objects.create_user(
+        username="rev_carol", email="rev_carol@example.com", password="pw"
+    )
     alice.friends.add(bob, carol)
     bob.friends.add(alice, carol)
     carol.friends.add(alice, bob)
@@ -312,7 +344,9 @@ def test_group_default_title_reverts_when_back_to_dm():
 
     r = a_client.post("/api/chats/start/", {"username": bob.username}, format="json")
     pk = str(r.data["url"]).rstrip("/").split("/")[-1]
-    r = a_client.post(f"/api/chats/{pk}/invite/", {"username": carol.username}, format="json")
+    r = a_client.post(
+        f"/api/chats/{pk}/invite/", {"username": carol.username}, format="json"
+    )
     assert r.data["title"] == "New group chat"
 
     r = a_client.delete(f"/api/chats/{pk}/members/{carol.username}/")
@@ -327,8 +361,12 @@ def test_group_default_title_reverts_when_back_to_dm():
 @pytest.mark.django_db
 def test_chat_cannot_remove_admin_or_self():
     User = get_user_model()
-    alice = User.objects.create_user(username="rmadm_alice", email="rmadm_alice@example.com", password="pw")
-    bob = User.objects.create_user(username="rmadm_bob", email="rmadm_bob@example.com", password="pw")
+    alice = User.objects.create_user(
+        username="rmadm_alice", email="rmadm_alice@example.com", password="pw"
+    )
+    bob = User.objects.create_user(
+        username="rmadm_bob", email="rmadm_bob@example.com", password="pw"
+    )
     alice.friends.add(bob)
     bob.friends.add(alice)
 

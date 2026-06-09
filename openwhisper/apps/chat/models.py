@@ -20,7 +20,7 @@ class Chat(models.Model):
 
     def __str__(self):
         return f"Chat between {self.users.all()}"
-    
+
     class Meta:
         verbose_name = "Chat"
         verbose_name_plural = "Chats"
@@ -30,6 +30,7 @@ class Chat(models.Model):
         ]
         db_table = "chats"
         app_label = "chat"
+
 
 class Message(models.Model):
     chat = models.ForeignKey(
@@ -52,7 +53,7 @@ class Message(models.Model):
 
     def __str__(self):
         return f"Message from {self.sender.username} to {self.chat.users.all()}"
-    
+
     class Meta:
         verbose_name = "Message"
         verbose_name_plural = "Messages"

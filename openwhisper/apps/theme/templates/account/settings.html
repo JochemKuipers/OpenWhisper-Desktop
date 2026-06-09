@@ -89,9 +89,12 @@
                         name="gender"
                         class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
                     <option value="">—</option>
-                    <option value="male" {% if profile_initial.gender == "male" %}selected{% endif %}>Male</option>
-                    <option value="female" {% if profile_initial.gender == "female" %}selected{% endif %}>Female</option>
-                    <option value="other" {% if profile_initial.gender == "other" %}selected{% endif %}>Other</option>
+                    <option value="male"
+                            {% if profile_initial.gender == "male" %}selected{% endif %}>Male</option>
+                    <option value="female"
+                            {% if profile_initial.gender == "female" %}selected{% endif %}>Female</option>
+                    <option value="other"
+                            {% if profile_initial.gender == "other" %}selected{% endif %}>Other</option>
                 </select>
             </div>
             <div>

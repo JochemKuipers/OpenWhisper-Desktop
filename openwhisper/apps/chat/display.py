@@ -52,14 +52,20 @@ def get_member_subtitle(chat: Chat, user) -> str:
         return ""
     parts = []
     for name in usernames:
-        if user and getattr(user, "is_authenticated", False) and name.lower() == user.username.lower():
+        if (
+            user
+            and getattr(user, "is_authenticated", False)
+            and name.lower() == user.username.lower()
+        ):
             parts.append("You")
         else:
             parts.append(name)
     return ", ".join(parts)
 
 
-def build_chat_updated_events(chat: Chat, user_ids: list[int] | None = None) -> list[tuple[int, dict]]:
+def build_chat_updated_events(
+    chat: Chat, user_ids: list[int] | None = None
+) -> list[tuple[int, dict]]:
     """Per-user social events so each client receives its own display_title / member_subtitle."""
     from django.contrib.auth import get_user_model
 

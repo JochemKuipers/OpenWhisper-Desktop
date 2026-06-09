@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("user", "0001_initial"),
     ]
@@ -15,7 +14,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="FriendRequest",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 (
                     "from_user",
@@ -48,10 +55,16 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="friendrequest",
-            index=models.Index(fields=["to_user", "-created_at"], name="user_fr_to_user_created_desc_idx"),
+            index=models.Index(
+                fields=["to_user", "-created_at"],
+                name="user_fr_to_user_created_desc_idx",
+            ),
         ),
         migrations.AddIndex(
             model_name="friendrequest",
-            index=models.Index(fields=["from_user", "-created_at"], name="user_fr_from_user_created_desc_idx"),
+            index=models.Index(
+                fields=["from_user", "-created_at"],
+                name="user_fr_from_user_created_desc_idx",
+            ),
         ),
     ]

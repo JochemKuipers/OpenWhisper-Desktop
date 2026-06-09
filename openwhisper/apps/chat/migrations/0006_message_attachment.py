@@ -4,20 +4,21 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('chat', '0005_chat_created_by'),
+        ("chat", "0005_chat_created_by"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='message',
-            name='attachment',
-            field=models.FileField(blank=True, null=True, upload_to='chat_attachments/'),
+            model_name="message",
+            name="attachment",
+            field=models.FileField(
+                blank=True, null=True, upload_to="chat_attachments/"
+            ),
         ),
         migrations.AlterField(
-            model_name='message',
-            name='content',
-            field=models.TextField(blank=True, default=''),
+            model_name="message",
+            name="content",
+            field=models.TextField(blank=True, default=""),
         ),
     ]

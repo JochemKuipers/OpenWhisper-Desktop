@@ -32,20 +32,29 @@ from openwhisper.apps.chat.friend_social import (
 )
 from openwhisper.apps.chat.models import Chat, Message
 from openwhisper.apps.chat.permissions import chat_admin, is_chat_admin
-from openwhisper.apps.chat.realtime import broadcast_chat_message, dispatch_social_events
+from openwhisper.apps.chat.realtime import (
+    broadcast_chat_message,
+    dispatch_social_events,
+)
 from openwhisper.apps.user.models import FriendRequest
 
 User = get_user_model()
 
 
 def _chat_detail_prefetched(pk: int) -> Chat:
-    return Chat.objects.select_related("created_by").prefetch_related(
-        "users",
-        Prefetch(
-            "messages",
-            queryset=Message.objects.select_related("sender").order_by("created_at"),
-        ),
-    ).get(pk=pk)
+    return (
+        Chat.objects.select_related("created_by")
+        .prefetch_related(
+            "users",
+            Prefetch(
+                "messages",
+                queryset=Message.objects.select_related("sender").order_by(
+                    "created_at"
+                ),
+            ),
+        )
+        .get(pk=pk)
+    )
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -121,8 +130,16 @@ class FriendRequestsAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        incoming_qs = FriendRequest.objects.filter(to_user=request.user).select_related("from_user").order_by("-created_at")
-        outgoing_qs = FriendRequest.objects.filter(from_user=request.user).select_related("to_user").order_by("-created_at")
+        incoming_qs = (
+            FriendRequest.objects.filter(to_user=request.user)
+            .select_related("from_user")
+            .order_by("-created_at")
+        )
+        outgoing_qs = (
+            FriendRequest.objects.filter(from_user=request.user)
+            .select_related("to_user")
+            .order_by("-created_at")
+        )
         incoming_users = [r.from_user for r in incoming_qs]
         outgoing_users = [r.to_user for r in outgoing_qs]
         return Response(
@@ -156,7 +173,8 @@ class FriendRequestAcceptAPIView(APIView):
         if not ok:
             st = (
                 status.HTTP_404_NOT_FOUND
-                if err in ("User not found.", "No pending friend request from this user.")
+                if err
+                in ("User not found.", "No pending friend request from this user.")
                 else status.HTTP_400_BAD_REQUEST
             )
             return Response({"detail": err}, status=st)
@@ -176,7 +194,8 @@ class FriendRequestCancelAPIView(APIView):
         if not ok:
             st = (
                 status.HTTP_404_NOT_FOUND
-                if err in ("User not found.", "No pending friend request with this user.")
+                if err
+                in ("User not found.", "No pending friend request with this user.")
                 else status.HTTP_400_BAD_REQUEST
             )
             return Response({"detail": err}, status=st)
@@ -208,10 +227,15 @@ class StartDmChatAPIView(APIView):
     def post(self, request):
         username = (request.data.get("username") or "").strip()
         if not username:
-            return Response({"detail": "username is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "username is required."}, status=status.HTTP_400_BAD_REQUEST
+            )
         other = get_object_or_404(User, username__iexact=username)
         if other.pk == request.user.pk:
-            return Response({"detail": "Cannot start a chat with yourself."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Cannot start a chat with yourself."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if not request.user.friends.filter(pk=other.pk).exists():
             return Response(
                 {"detail": "You can only chat with accepted friends."},
@@ -227,7 +251,9 @@ class StartDmChatAPIView(APIView):
                 "users",
                 Prefetch(
                     "messages",
-                    queryset=Message.objects.select_related("sender").order_by("created_at"),
+                    queryset=Message.objects.select_related("sender").order_by(
+                        "created_at"
+                    ),
                 ),
             )
             .first()
@@ -239,7 +265,10 @@ class StartDmChatAPIView(APIView):
         chat.users.add(request.user, other)
         chat = _chat_detail_prefetched(chat.pk)
         dispatch_social_events(build_chat_updated_events(chat))
-        return Response(ChatSerializer(chat, context={"request": request}).data, status=status.HTTP_201_CREATED)
+        return Response(
+            ChatSerializer(chat, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class ChatInviteAPIView(APIView):
@@ -250,13 +279,18 @@ class ChatInviteAPIView(APIView):
     def post(self, request, chat_id):
         username = (request.data.get("username") or "").strip()
         if not username:
-            return Response({"detail": "username is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "username is required."}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         chat = Chat.objects.select_related("created_by").filter(pk=chat_id).first()
         if chat is None:
             raise Http404()
         if not chat.users.filter(pk=request.user.pk).exists():
-            return Response({"detail": "You are not a member of this chat."}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"detail": "You are not a member of this chat."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if not is_chat_admin(request.user, chat):
             return Response(
                 {"detail": "Only the chat admin can invite people."},
@@ -265,13 +299,24 @@ class ChatInviteAPIView(APIView):
 
         invitee = User.objects.filter(username__iexact=username).first()
         if invitee is None:
-            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND
+            )
         if invitee.pk == request.user.pk:
-            return Response({"detail": "Cannot invite yourself."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Cannot invite yourself."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if chat.users.filter(pk=invitee.pk).exists():
-            return Response({"detail": "User is already in this chat."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "User is already in this chat."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if not request.user.friends.filter(pk=invitee.pk).exists():
-            return Response({"detail": "You can only invite friends."}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"detail": "You can only invite friends."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         chat.users.add(invitee)
         chat.save(update_fields=["updated_at"])
@@ -298,13 +343,18 @@ class ChatRemoveMemberAPIView(APIView):
     def delete(self, request, chat_id, username):
         username = (username or "").strip()
         if not username:
-            return Response({"detail": "username is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "username is required."}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         chat = Chat.objects.select_related("created_by").filter(pk=chat_id).first()
         if chat is None:
             raise Http404()
         if not chat.users.filter(pk=request.user.pk).exists():
-            return Response({"detail": "You are not a member of this chat."}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"detail": "You are not a member of this chat."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         if not is_chat_admin(request.user, chat):
             return Response(
                 {"detail": "Only the chat admin can remove members."},
@@ -313,7 +363,9 @@ class ChatRemoveMemberAPIView(APIView):
 
         target = User.objects.filter(username__iexact=username).first()
         if target is None:
-            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND
+            )
         if target.pk == request.user.pk:
             return Response(
                 {"detail": "You cannot remove yourself from the chat."},
@@ -328,7 +380,10 @@ class ChatRemoveMemberAPIView(APIView):
             )
 
         if not chat.users.filter(pk=target.pk).exists():
-            return Response({"detail": "User is not in this chat."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "User is not in this chat."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         chat.users.remove(target)
         chat.save(update_fields=["updated_at"])
@@ -337,7 +392,9 @@ class ChatRemoveMemberAPIView(APIView):
         refreshed = _chat_detail_prefetched(chat.pk)
         remaining_ids = list(refreshed.users.values_list("pk", flat=True))
         notify_ids = remaining_ids + [target.pk]
-        dispatch_social_events(build_chat_updated_events(refreshed, user_ids=notify_ids))
+        dispatch_social_events(
+            build_chat_updated_events(refreshed, user_ids=notify_ids)
+        )
         broadcast_chat_message(
             chat_id=refreshed.pk,
             payload={
@@ -362,13 +419,19 @@ class ChatViewSet(viewsets.ModelViewSet):
     serializer_class = ChatSerializer
 
     def get_queryset(self):
-        qs = Chat.objects.select_related("created_by").prefetch_related(
-            "users",
-            Prefetch(
-                "messages",
-                queryset=Message.objects.select_related("sender").order_by("created_at"),
-            ),
-        ).order_by("-updated_at")
+        qs = (
+            Chat.objects.select_related("created_by")
+            .prefetch_related(
+                "users",
+                Prefetch(
+                    "messages",
+                    queryset=Message.objects.select_related("sender").order_by(
+                        "created_at"
+                    ),
+                ),
+            )
+            .order_by("-updated_at")
+        )
         return qs.filter(users=self.request.user).distinct()
 
     def update(self, request, *args, **kwargs):
@@ -383,7 +446,9 @@ class ChatViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         if not serializer.validated_data:
             refreshed = _chat_detail_prefetched(instance.pk)
-            return Response(ChatSerializer(refreshed, context={"request": request}).data)
+            return Response(
+                ChatSerializer(refreshed, context={"request": request}).data
+            )
 
         self.perform_update(serializer)
 
@@ -416,9 +481,14 @@ class ChatMessagesAPIView(APIView):
     def get(self, request, chat_id):
         chat = self.get_object(chat_id)
         if not chat.users.filter(pk=request.user.pk).exists():
-            return Response({"detail": "You are not a member of this chat."}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"detail": "You are not a member of this chat."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         messages = Message.objects.filter(chat=chat).order_by("created_at")
-        serializer = MessageSerializer(messages, many=True, context={"request": request})
+        serializer = MessageSerializer(
+            messages, many=True, context={"request": request}
+        )
         return Response(serializer.data)
 
     def post(self, request, chat_id):
@@ -460,7 +530,9 @@ class ChatMessagesAPIView(APIView):
         try:
             chat = self.get_object(chat_id)
             chat.delete()
-            return Response("Chat deleted successfully", status=status.HTTP_204_NO_CONTENT)
+            return Response(
+                "Chat deleted successfully", status=status.HTTP_204_NO_CONTENT
+            )
         except Chat.DoesNotExist:
             return Response("Chat not found", status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
@@ -472,7 +544,9 @@ class LogoutAPIView(APIView):
 
     def post(self, request):
         logout(request)
-        return Response({"detail": "Logged out successfully"}, status=status.HTTP_200_OK)
+        return Response(
+            {"detail": "Logged out successfully"}, status=status.HTTP_200_OK
+        )
 
 
 class HealthCheckAPIView(APIView):
@@ -490,4 +564,6 @@ class RegisterAPIView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response({"detail": "User registered successfully"}, status=status.HTTP_201_CREATED)
+        return Response(
+            {"detail": "User registered successfully"}, status=status.HTTP_201_CREATED
+        )

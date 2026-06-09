@@ -5,19 +5,20 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('chat', '0002_message_related_name_messages'),
+        ("chat", "0002_message_related_name_messages"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AlterUniqueTogether(
-            name='message',
+            name="message",
             unique_together=set(),
         ),
         migrations.AddIndex(
-            model_name='message',
-            index=models.Index(fields=['chat', 'created_at'], name='messages_chat_id_ec31ea_idx'),
+            model_name="message",
+            index=models.Index(
+                fields=["chat", "created_at"], name="messages_chat_id_ec31ea_idx"
+            ),
         ),
     ]

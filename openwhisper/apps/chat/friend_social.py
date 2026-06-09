@@ -14,7 +14,9 @@ User = get_user_model()
 SocialEvent = Tuple[int, dict]
 
 
-def friend_request_send(actor: User, username: str) -> Tuple[bool, Optional[str], List[SocialEvent]]:
+def friend_request_send(
+    actor: User, username: str
+) -> Tuple[bool, Optional[str], List[SocialEvent]]:
     username = (username or "").strip()
     if not username:
         return False, "username is required.", []
@@ -41,7 +43,9 @@ def friend_request_send(actor: User, username: str) -> Tuple[bool, Optional[str]
     return True, None, events
 
 
-def friend_request_accept(actor: User, username: str) -> Tuple[bool, Optional[str], List[SocialEvent]]:
+def friend_request_accept(
+    actor: User, username: str
+) -> Tuple[bool, Optional[str], List[SocialEvent]]:
     username = (username or "").strip()
     if not username:
         return False, "username is required.", []
@@ -60,7 +64,9 @@ def friend_request_accept(actor: User, username: str) -> Tuple[bool, Optional[st
     return True, None, events
 
 
-def friend_request_cancel(actor: User, username: str) -> Tuple[bool, Optional[str], List[SocialEvent]]:
+def friend_request_cancel(
+    actor: User, username: str
+) -> Tuple[bool, Optional[str], List[SocialEvent]]:
     username = (username or "").strip()
     if not username:
         return False, "username is required.", []
@@ -72,20 +78,30 @@ def friend_request_cancel(actor: User, username: str) -> Tuple[bool, Optional[st
 
     if FriendRequest.objects.filter(from_user=actor, to_user=other).delete()[0]:
         deleted = True
-        events.append((other.pk, {"type": "friend_request_removed", "username": actor.username}))
-        events.append((actor.pk, {"type": "friend_request_removed", "username": other.username}))
+        events.append(
+            (other.pk, {"type": "friend_request_removed", "username": actor.username})
+        )
+        events.append(
+            (actor.pk, {"type": "friend_request_removed", "username": other.username})
+        )
 
     if FriendRequest.objects.filter(from_user=other, to_user=actor).delete()[0]:
         deleted = True
-        events.append((other.pk, {"type": "friend_request_removed", "username": actor.username}))
-        events.append((actor.pk, {"type": "friend_request_removed", "username": other.username}))
+        events.append(
+            (other.pk, {"type": "friend_request_removed", "username": actor.username})
+        )
+        events.append(
+            (actor.pk, {"type": "friend_request_removed", "username": other.username})
+        )
 
     if not deleted:
         return False, "No pending friend request with this user.", []
     return True, None, events
 
 
-def friend_remove(actor: User, username: str) -> Tuple[bool, Optional[str], List[SocialEvent]]:
+def friend_remove(
+    actor: User, username: str
+) -> Tuple[bool, Optional[str], List[SocialEvent]]:
     """End mutual friendship (symmetrical M2M) and notify both users."""
     username = (username or "").strip()
     if not username:

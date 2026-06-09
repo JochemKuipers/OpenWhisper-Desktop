@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -15,47 +14,79 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Chat',
+            name="Chat",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('users', models.ManyToManyField(blank=True, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "users",
+                    models.ManyToManyField(blank=True, to=settings.AUTH_USER_MODEL),
+                ),
             ],
             options={
-                'verbose_name': 'Chat',
-                'verbose_name_plural': 'Chats',
-                'db_table': 'chats',
-                'ordering': ['-created_at'],
+                "verbose_name": "Chat",
+                "verbose_name_plural": "Chats",
+                "db_table": "chats",
+                "ordering": ["-created_at"],
             },
         ),
         migrations.CreateModel(
-            name='Message',
+            name="Message",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('content', models.TextField()),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('chat', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='chat.chat')),
-                ('sender', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("content", models.TextField()),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "chat",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, to="chat.chat"
+                    ),
+                ),
+                (
+                    "sender",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Message',
-                'verbose_name_plural': 'Messages',
-                'db_table': 'messages',
-                'ordering': ['-created_at'],
+                "verbose_name": "Message",
+                "verbose_name_plural": "Messages",
+                "db_table": "messages",
+                "ordering": ["-created_at"],
             },
         ),
         migrations.AddIndex(
-            model_name='chat',
-            index=models.Index(fields=['created_at'], name='chats_created_e8f0e7_idx'),
+            model_name="chat",
+            index=models.Index(fields=["created_at"], name="chats_created_e8f0e7_idx"),
         ),
         migrations.AddIndex(
-            model_name='message',
-            index=models.Index(fields=['created_at'], name='messages_created_919c58_idx'),
+            model_name="message",
+            index=models.Index(
+                fields=["created_at"], name="messages_created_919c58_idx"
+            ),
         ),
         migrations.AlterUniqueTogether(
-            name='message',
-            unique_together={('chat', 'sender')},
+            name="message",
+            unique_together={("chat", "sender")},
         ),
     ]

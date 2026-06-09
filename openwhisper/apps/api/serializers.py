@@ -46,7 +46,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True)
-    phone_number = serializers.CharField(max_length=10, required=False, allow_blank=True, default="")
+    phone_number = serializers.CharField(
+        max_length=10, required=False, allow_blank=True, default=""
+    )
 
     class Meta:
         model = User
@@ -75,7 +77,9 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if attrs["password"] != attrs.pop("password_confirm"):
-            raise serializers.ValidationError({"password_confirm": "Passwords do not match."})
+            raise serializers.ValidationError(
+                {"password_confirm": "Passwords do not match."}
+            )
         return attrs
 
     def create(self, validated_data):
@@ -91,7 +95,14 @@ class MessageSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Message
-        fields = ["url", "sender", "content", "attachment_url", "created_at", "updated_at"]
+        fields = [
+            "url",
+            "sender",
+            "content",
+            "attachment_url",
+            "created_at",
+            "updated_at",
+        ]
 
     def get_attachment_url(self, obj):
         if not obj.attachment:
